@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useStorage } from '../hooks/useStorage'
+import { supabase } from '../supabase'
 import Modal from './Modal'
 import { inputStyle, labelStyle, btnPrimary, btnSecondary } from './Input'
 
@@ -43,44 +43,6 @@ const PlusIcon = ({ size = 16 }) => (
   </svg>
 )
 
-const defaultPrograms = [
-  { id: 1, name: 'Push Day', tag: 'Strength', exercises: [
-    { id: 1, name: 'Bench Press', sets: 4, reps: '8–10', weight: '185', variants: [
-      { id: 11, name: 'Paused Bench Press', sets: 3, reps: '6–8', weight: '165' },
-    ]},
-    { id: 2, name: 'Incline Dumbbell Press', sets: 3, reps: '10–12', weight: '65', variants: [
-      { id: 21, name: 'Iso Lateral Press', sets: 3, reps: '10–12', weight: '55' },
-    ]},
-    { id: 3, name: 'Shoulder Press', sets: 3, reps: '10–12', weight: '115', variants: [] },
-    { id: 4, name: 'Lateral Raises', sets: 3, reps: '15', weight: '20', variants: [] },
-    { id: 5, name: 'Tricep Pushdown', sets: 3, reps: '12–15', weight: '50', variants: [] },
-  ]},
-  { id: 2, name: 'Pull Day', tag: 'Strength', exercises: [
-    { id: 6, name: 'Deadlift', sets: 4, reps: '5', weight: '275', variants: [] },
-    { id: 7, name: 'Pull-ups', sets: 3, reps: '8–10', weight: '0', variants: [
-      { id: 71, name: 'Assisted Pull-ups', sets: 3, reps: '10–12', weight: '0' },
-    ]},
-    { id: 8, name: 'Barbell Row', sets: 3, reps: '8–10', weight: '155', variants: [] },
-    { id: 9, name: 'Face Pulls', sets: 3, reps: '15', weight: '40', variants: [] },
-    { id: 10, name: 'Bicep Curls', sets: 3, reps: '12', weight: '35', variants: [
-      { id: 101, name: 'Hammer Curls', sets: 3, reps: '12', weight: '30' },
-    ]},
-  ]},
-  { id: 3, name: 'Leg Day', tag: 'Strength', exercises: [
-    { id: 12, name: 'Squat', sets: 4, reps: '6–8', weight: '225', variants: [
-      { id: 121, name: 'Pause Squat', sets: 3, reps: '5', weight: '185' },
-    ]},
-    { id: 13, name: 'Romanian Deadlift', sets: 3, reps: '10', weight: '185', variants: [] },
-    { id: 14, name: 'Leg Press', sets: 3, reps: '12', weight: '360', variants: [] },
-    { id: 15, name: 'Leg Curl', sets: 3, reps: '12', weight: '100', variants: [] },
-    { id: 16, name: 'Calf Raises', sets: 4, reps: '15–20', weight: '135', variants: [] },
-  ]},
-  { id: 4, name: 'Zone 2 Cardio', tag: 'Cardio', exercises: [
-    { id: 17, name: 'Incline walk / jog', sets: 1, reps: '45 min', weight: '0', variants: [] },
-  ]},
-]
-
-// Retina-sharp progress chart
 function ProgressChart({ data }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
@@ -98,7 +60,7 @@ function ProgressChart({ data }) {
     return data.map((d, i) => ({
       x: PAD.L + (i / Math.max(data.length - 1, 1)) * chartW,
       y: PAD.T + chartH - ((vals[i] - min) / (max - min || 1)) * chartH,
-      ...d, idx: i, min, max,
+      ...d, idx: i,
     }))
   }
 
@@ -219,50 +181,21 @@ function ProgressChart({ data }) {
   )
 }
 
-// Single exercise row — works for both top-level and variants
-function ExerciseRow({ ex, isVariant = false, progId, logs, setLogs, today, lastWeek, onEdit, onAddVariant, allCharts, setAllCharts }) {
+function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData }) {
   const [expanded, setExpanded] = useState(false)
   const [variantsOpen, setVariantsOpen] = useState(false)
 
-  const exLog = logs?.[progId]?.[today]?.[ex.id] || {}
-  const lwLog = logs?.[progId]?.[lastWeek]?.[ex.id] || {}
+  const exLog = todayLogs[ex.id] || {}
+  const lwLog = lastWeekLogs[ex.id] || {}
 
-  const setExLog = (field, value) => {
-    setLogs(l => ({
-      ...l,
-      [progId]: {
-        ...(l[progId] || {}),
-        [today]: {
-          ...(l[progId]?.[today] || {}),
-          [ex.id]: { ...(l[progId]?.[today]?.[ex.id] || {}), [field]: value }
-        }
-      }
-    }))
-  }
+  const toggleDone = () => onLogChange(ex.id, 'done', !exLog.done)
 
-  const toggleDone = () => setExLog('done', !exLog.done)
-
-  const getChartData = () => {
-    const progLogs = logs[progId] || {}
-    return Object.entries(progLogs)
-      .filter(([, dayLog]) => dayLog[ex.id]?.weight && parseFloat(dayLog[ex.id].weight) > 0)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-8)
-      .map(([date, dayLog]) => ({
-        label: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        value: dayLog[ex.id].weight,
-      }))
-  }
-
-  const chartKey = `${progId}-${ex.id}`
+  const chartKey = `${ex.id}`
   const isChartOpen = allCharts === chartKey
-
-  const hasVariants = !isVariant && ex.variants && ex.variants.length > 0
 
   return (
     <div style={{ borderRadius: isVariant ? '14px' : '18px', background: exLog.done ? 'rgba(16,185,129,0.08)' : isVariant ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)', border: `1px solid ${exLog.done ? 'rgba(16,185,129,0.25)' : isVariant ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.15)'}`, overflow: 'hidden', transition: 'all 0.2s' }}>
 
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: isVariant ? '11px 14px' : '14px 16px', cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
         {isVariant && <div style={{ width: '2px', height: '28px', background: 'rgba(99,102,241,0.4)', borderRadius: '1px', flexShrink: 0 }} />}
         <div onClick={e => { e.stopPropagation(); toggleDone() }} style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, cursor: 'pointer', background: exLog.done ? '#10B981' : 'rgba(255,255,255,0.1)', border: `2px solid ${exLog.done ? '#10B981' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -282,11 +215,8 @@ function ExerciseRow({ ex, isVariant = false, progId, logs, setLogs, today, last
         </div>
       </div>
 
-      {/* Expanded detail */}
       {expanded && (
         <div style={{ padding: '0 16px 14px', paddingLeft: isVariant ? '32px' : '16px' }}>
-
-          {/* Targets */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             {[{ label: 'Sets', value: ex.sets }, { label: 'Reps', value: ex.reps }, { label: 'Target', value: ex.weight > 0 ? `${ex.weight} lbs` : '—' }].map(s => (
               <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '8px 10px' }}>
@@ -296,31 +226,32 @@ function ExerciseRow({ ex, isVariant = false, progId, logs, setLogs, today, last
             ))}
           </div>
 
-          {/* Last week */}
-          {(lwLog.weight || lwLog.reps) && (
+          {(lwLog.weight_used || lwLog.reps_done) && (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px', padding: '8px 12px', borderRadius: '10px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(199,200,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               <span style={{ fontSize: '12px', color: 'rgba(199,200,255,0.7)' }}>
-                Last week: <strong style={{ color: '#fff' }}>{lwLog.weight ? `${lwLog.weight} lbs` : ''}{lwLog.weight && lwLog.reps ? ' · ' : ''}{lwLog.reps ? `${lwLog.reps} reps` : ''}</strong>
+                Last week: <strong style={{ color: '#fff' }}>{lwLog.weight_used ? `${lwLog.weight_used} lbs` : ''}{lwLog.weight_used && lwLog.reps_done ? ' · ' : ''}{lwLog.reps_done ? `${lwLog.reps_done} reps` : ''}</strong>
               </span>
             </div>
           )}
 
-          {/* Log inputs */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
             <div>
               <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '5px' }}>Weight (lbs)</label>
-              <input type="number" placeholder={ex.weight || '0'} value={exLog.weight || ''} onChange={e => setExLog('weight', e.target.value)}
+              <input type="number" placeholder={ex.weight || '0'} value={exLog.weight_used || ''}
+                onChange={e => onLogChange(ex.id, 'weight_used', e.target.value)}
+                onBlur={e => onLogChange(ex.id, 'weight_used', e.target.value)}
                 style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '10px 12px', color: '#fff', fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box' }} />
             </div>
             <div>
               <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '5px' }}>Reps done</label>
-              <input type="text" placeholder={ex.reps} value={exLog.reps || ''} onChange={e => setExLog('reps', e.target.value)}
+              <input type="text" placeholder={ex.reps} value={exLog.reps_done || ''}
+                onChange={e => onLogChange(ex.id, 'reps_done', e.target.value)}
+                onBlur={e => onLogChange(ex.id, 'reps_done', e.target.value)}
                 style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '10px 12px', color: '#fff', fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box' }} />
             </div>
           </div>
 
-          {/* Progress chart */}
           <button onClick={() => setAllCharts(isChartOpen ? null : chartKey)} style={{ width: '100%', padding: '8px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             {isChartOpen ? 'Hide progress' : 'View progress'}
@@ -329,8 +260,8 @@ function ExerciseRow({ ex, isVariant = false, progId, logs, setLogs, today, last
           {isChartOpen && (
             <div style={{ marginTop: '10px', padding: '14px', background: 'rgba(255,255,255,0.04)', borderRadius: '12px' }}>
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px' }}>Weight over time (lbs)</p>
-              {getChartData().length >= 2
-                ? <ProgressChart data={getChartData()} />
+              {chartData && chartData.length >= 2
+                ? <ProgressChart data={chartData} />
                 : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>Log 2+ sessions to see your chart.</p>
               }
             </div>
@@ -338,7 +269,6 @@ function ExerciseRow({ ex, isVariant = false, progId, logs, setLogs, today, last
         </div>
       )}
 
-      {/* Variants */}
       {!isVariant && variantsOpen && ex.variants?.length > 0 && (
         <div style={{ padding: '0 12px 12px 36px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -347,13 +277,13 @@ function ExerciseRow({ ex, isVariant = false, progId, logs, setLogs, today, last
             <div style={{ height: '1px', flex: 1, background: 'rgba(255,255,255,0.08)' }} />
           </div>
           {ex.variants.map(v => (
-            <ExerciseRow key={v.id} ex={v} isVariant progId={progId} logs={logs} setLogs={setLogs} today={today} lastWeek={lastWeek}
-              onEdit={onEdit} onAddVariant={onAddVariant} allCharts={allCharts} setAllCharts={setAllCharts} />
+            <ExerciseRow key={v.id} ex={v} isVariant todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
+              onEdit={onEdit} onAddVariant={onAddVariant} allCharts={allCharts} setAllCharts={setAllCharts}
+              onLogChange={onLogChange} chartData={chartData} />
           ))}
         </div>
       )}
 
-      {/* Add similar button — only on top-level when variants open */}
       {!isVariant && variantsOpen && (
         <div style={{ padding: '0 12px 12px 36px' }}>
           <button onClick={() => onAddVariant(ex.id)} style={{ width: '100%', padding: '9px', borderRadius: '12px', cursor: 'pointer', background: 'transparent', border: '1px dashed rgba(99,102,241,0.35)', color: 'rgba(199,200,255,0.6)', fontSize: '12px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
@@ -367,55 +297,142 @@ function ExerciseRow({ ex, isVariant = false, progId, logs, setLogs, today, last
 }
 
 export default function Workout() {
-  const [programs, setPrograms] = useStorage('workout_programs', defaultPrograms)
-const [logs, setLogs] = useStorage('workout_logs', {})
+  const [programs, setPrograms] = useState([])
+  const [todayLogs, setTodayLogs] = useState({})
+  const [lastWeekLogs, setLastWeekLogs] = useState({})
+  const [chartData, setChartData] = useState({})
   const [selected, setSelected] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [allCharts, setAllCharts] = useState(null)
-
   const [showAddProg, setShowAddProg] = useState(false)
   const [showExModal, setShowExModal] = useState(false)
   const [editingProg, setEditingProg] = useState(null)
-  const [editingEx, setEditingEx] = useState(null)       // { exId, parentId } parentId = null if top-level
-  const [addingVariantFor, setAddingVariantFor] = useState(null) // parentExId
-
+  const [editingEx, setEditingEx] = useState(null)
+  const [addingVariantFor, setAddingVariantFor] = useState(null)
   const [progForm, setProgForm] = useState({ name: '', tag: 'Strength' })
   const [exForm, setExForm] = useState({ name: '', sets: '', reps: '', weight: '' })
 
   const today = new Date().toISOString().split('T')[0]
   const lastWeek = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
 
+  // Load everything from Supabase
+  useEffect(() => { loadAll() }, [])
+
+  const loadAll = async () => {
+    setLoading(true)
+    try {
+      // Load programs
+      const { data: progs } = await supabase.from('programs').select('*').order('id')
+      // Load exercises
+      const { data: exs } = await supabase.from('exercises').select('*').order('sort_order')
+      // Load today's logs
+      const { data: tLogs } = await supabase.from('workout_logs').select('*').eq('logged_date', today)
+      // Load last week's logs
+      const { data: lwLogs } = await supabase.from('workout_logs').select('*').eq('logged_date', lastWeek)
+      // Load all logs for charts
+      const { data: allLogs } = await supabase.from('workout_logs').select('*').order('logged_date')
+
+      // Build programs with nested exercises
+      const exerciseMap = {}
+      const topLevel = []
+      exs?.forEach(e => { exerciseMap[e.id] = { ...e, variants: [] } })
+      exs?.forEach(e => {
+        if (e.parent_id) {
+          if (exerciseMap[e.parent_id]) exerciseMap[e.parent_id].variants.push(exerciseMap[e.id])
+        } else {
+          topLevel.push(exerciseMap[e.id])
+        }
+      })
+
+      const builtProgs = progs?.map(p => ({
+        ...p,
+        exercises: topLevel.filter(e => e.program_id === p.id)
+      })) || []
+
+      setPrograms(builtProgs)
+
+      // Build today log map { exId: log }
+      const tMap = {}
+      tLogs?.forEach(l => { tMap[l.exercise_id] = l })
+      setTodayLogs(tMap)
+
+      // Build last week log map
+      const lwMap = {}
+      lwLogs?.forEach(l => { lwMap[l.exercise_id] = l })
+      setLastWeekLogs(lwMap)
+
+      // Build chart data per exercise
+      const cMap = {}
+      allLogs?.forEach(l => {
+        if (!l.weight_used || parseFloat(l.weight_used) <= 0) return
+        if (!cMap[l.exercise_id]) cMap[l.exercise_id] = []
+        cMap[l.exercise_id].push({
+          label: new Date(l.logged_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          value: l.weight_used,
+        })
+      })
+      setChartData(cMap)
+
+    } catch (e) { console.error(e) }
+    setLoading(false)
+  }
+
   const prog = programs.find(p => p.id === selected)
 
   const donePct = (() => {
     if (!prog) return 0
-    const todayLog = logs?.[selected]?.[today] || {}
     const allExIds = prog.exercises.flatMap(e => [e.id, ...(e.variants || []).map(v => v.id)])
-    const doneCount = allExIds.filter(id => todayLog[id]?.done).length
+    const doneCount = allExIds.filter(id => todayLogs[id]?.done).length
     return Math.round(doneCount / Math.max(allExIds.length, 1) * 100)
   })()
 
+  // Log a field for an exercise — upsert to Supabase
+  const handleLogChange = async (exId, field, value) => {
+    // Optimistic update
+    setTodayLogs(prev => ({
+      ...prev,
+      [exId]: { ...(prev[exId] || {}), [field]: value, exercise_id: exId }
+    }))
+
+    const existing = todayLogs[exId]
+    if (existing?.id) {
+      await supabase.from('workout_logs').update({ [field]: value }).eq('id', existing.id)
+    } else {
+      const { data } = await supabase.from('workout_logs').insert({
+        exercise_id: exId, logged_date: today, [field]: value
+      }).select().single()
+      if (data) setTodayLogs(prev => ({ ...prev, [exId]: data }))
+    }
+  }
+
   // Program CRUD
   const openAddProg = () => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setShowAddProg(true) }
-  const openEditProg = (e, p) => { e.stopPropagation(); setEditingProg(p.id); setProgForm({ name: p.name, tag: p.tag }); setShowAddProg(true) }
-  const saveProg = () => {
+  const openEditProg = (e, p) => { e.stopPropagation(); setEditingProg(p); setProgForm({ name: p.name, tag: p.tag }); setShowAddProg(true) }
+
+  const saveProg = async () => {
     if (!progForm.name.trim()) return
-    if (editingProg) { setPrograms(ps => ps.map(p => p.id === editingProg ? { ...p, ...progForm } : p)) }
-    else { setPrograms(ps => [...ps, { id: Date.now(), ...progForm, exercises: [] }]) }
+    if (editingProg) {
+      await supabase.from('programs').update(progForm).eq('id', editingProg.id)
+    } else {
+      await supabase.from('programs').insert(progForm)
+    }
     setShowAddProg(false)
+    loadAll()
   }
-  const deleteProg = () => { setPrograms(ps => ps.filter(p => p.id !== editingProg)); setSelected(null); setShowAddProg(false) }
+
+  const deleteProg = async () => {
+    await supabase.from('programs').delete().eq('id', editingProg.id)
+    setSelected(null)
+    setShowAddProg(false)
+    loadAll()
+  }
 
   // Exercise CRUD
   const openAddEx = () => { setEditingEx(null); setAddingVariantFor(null); setExForm({ name: '', sets: '', reps: '', weight: '' }); setShowExModal(true) }
 
   const openEditEx = (e, ex) => {
     e.stopPropagation()
-    // figure out if it's a variant
-    let parentId = null
-    prog?.exercises.forEach(parent => {
-      if (parent.variants?.find(v => v.id === ex.id)) parentId = parent.id
-    })
-    setEditingEx({ exId: ex.id, parentId })
+    setEditingEx(ex)
     setAddingVariantFor(null)
     setExForm({ name: ex.name, sets: String(ex.sets), reps: ex.reps, weight: String(ex.weight) })
     setShowExModal(true)
@@ -428,58 +445,36 @@ const [logs, setLogs] = useStorage('workout_logs', {})
     setShowExModal(true)
   }
 
-  const saveEx = () => {
+  const saveEx = async () => {
     if (!exForm.name.trim()) return
-    const built = { ...exForm, sets: parseInt(exForm.sets) || 1 }
+    const built = { name: exForm.name, sets: parseInt(exForm.sets) || 1, reps: exForm.reps, weight: exForm.weight }
 
-    setPrograms(ps => ps.map(p => {
-      if (p.id !== selected) return p
-
-      // Editing existing
-      if (editingEx) {
-        const { exId, parentId } = editingEx
-        if (parentId) {
-          // editing a variant
-          return { ...p, exercises: p.exercises.map(ex => ex.id === parentId
-            ? { ...ex, variants: ex.variants.map(v => v.id === exId ? { ...v, ...built } : v) }
-            : ex) }
-        } else {
-          // editing top-level
-          return { ...p, exercises: p.exercises.map(ex => ex.id === exId ? { ...ex, ...built } : ex) }
-        }
-      }
-
-      // Adding variant
-      if (addingVariantFor) {
-        return { ...p, exercises: p.exercises.map(ex => ex.id === addingVariantFor
-          ? { ...ex, variants: [...(ex.variants || []), { id: Date.now(), ...built }] }
-          : ex) }
-      }
-
-      // Adding top-level
-      return { ...p, exercises: [...p.exercises, { id: Date.now(), ...built, variants: [] }] }
-    }))
+    if (editingEx) {
+      await supabase.from('exercises').update(built).eq('id', editingEx.id)
+    } else if (addingVariantFor) {
+      await supabase.from('exercises').insert({ ...built, program_id: selected, parent_id: addingVariantFor })
+    } else {
+      await supabase.from('exercises').insert({ ...built, program_id: selected })
+    }
     setShowExModal(false)
+    loadAll()
   }
 
-  const deleteEx = () => {
-    if (!editingEx) return
-    const { exId, parentId } = editingEx
-    setPrograms(ps => ps.map(p => {
-      if (p.id !== selected) return p
-      if (parentId) {
-        return { ...p, exercises: p.exercises.map(ex => ex.id === parentId
-          ? { ...ex, variants: ex.variants.filter(v => v.id !== exId) }
-          : ex) }
-      }
-      return { ...p, exercises: p.exercises.filter(ex => ex.id !== exId) }
-    }))
+  const deleteEx = async () => {
+    await supabase.from('exercises').delete().eq('id', editingEx.id)
     setShowExModal(false)
+    loadAll()
   }
 
-  const modalTitle = editingEx
-    ? (editingEx.parentId ? 'Edit similar exercise' : 'Edit exercise')
-    : addingVariantFor ? 'Add similar exercise' : 'Add exercise'
+  const modalTitle = editingEx ? (editingEx.parent_id ? 'Edit similar exercise' : 'Edit exercise') : addingVariantFor ? 'Add similar exercise' : 'Add exercise'
+
+  if (loading) return (
+    <div style={{ padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px' }}>
+      <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '3px solid rgba(255,255,255,0.1)', borderTop: '3px solid #6366F1', animation: 'spin 1s linear infinite' }} />
+      <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px' }}>Loading workouts...</p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
+  )
 
   return (
     <div style={{ padding: '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -494,14 +489,13 @@ const [logs, setLogs] = useStorage('workout_logs', {})
         </button>
       </div>
 
-      {/* Program list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {programs.map(p => (
           <button key={p.id} onClick={() => setSelected(p.id === selected ? null : p.id)} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '20px', cursor: 'pointer', background: selected === p.id ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.08)', border: `1px solid ${selected === p.id ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.15)'}`, fontFamily: 'Inter, sans-serif', textAlign: 'left', transition: 'all 0.2s' }}>
             <div style={iconBg}>{p.tag === 'Cardio' ? <HeartIcon /> : <DumbbellIcon />}</div>
             <div style={{ flex: 1 }}>
               <p style={{ fontSize: '15px', fontWeight: '600', color: '#fff' }}>{p.name}</p>
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{p.exercises.length} exercises · {p.tag}</p>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{p.exercises?.length || 0} exercises · {p.tag}</p>
             </div>
             <button onClick={e => openEditProg(e, p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '4px' }}>
               <EditIcon />
@@ -510,7 +504,6 @@ const [logs, setLogs] = useStorage('workout_logs', {})
         ))}
       </div>
 
-      {/* Active workout */}
       {selected && prog && (
         <>
           <div style={{ ...glass, padding: '18px 20px' }}>
@@ -525,14 +518,13 @@ const [logs, setLogs] = useStorage('workout_logs', {})
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {prog.exercises.map(ex => (
-              <ExerciseRow key={ex.id} ex={ex} progId={selected} logs={logs} setLogs={setLogs}
-                today={today} lastWeek={lastWeek} onEdit={openEditEx} onAddVariant={openAddVariant}
-                allCharts={allCharts} setAllCharts={setAllCharts} />
+              <ExerciseRow key={ex.id} ex={ex} todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
+                onEdit={openEditEx} onAddVariant={openAddVariant}
+                allCharts={allCharts} setAllCharts={setAllCharts}
+                onLogChange={handleLogChange} chartData={chartData[ex.id]} />
             ))}
-
             <button onClick={openAddEx} style={{ padding: '14px', borderRadius: '18px', cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.4)', fontSize: '14px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-              <PlusIcon />
-              Add exercise
+              <PlusIcon /> Add exercise
             </button>
           </div>
 
@@ -548,7 +540,6 @@ const [logs, setLogs] = useStorage('workout_logs', {})
         </>
       )}
 
-      {/* Program modal */}
       {showAddProg && (
         <Modal title={editingProg ? 'Edit program' : 'New program'} onClose={() => setShowAddProg(false)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -567,7 +558,6 @@ const [logs, setLogs] = useStorage('workout_logs', {})
         </Modal>
       )}
 
-      {/* Exercise modal */}
       {showExModal && (
         <Modal title={modalTitle} onClose={() => setShowExModal(false)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
