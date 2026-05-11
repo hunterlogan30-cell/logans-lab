@@ -1,5 +1,14 @@
 import { useState } from 'react'
 
+// KEY REGISTRY — never change these keys or data will reset
+export const STORAGE_KEYS = {
+  schedule: 'schedule_blocks',
+  workoutPrograms: 'workout_programs',
+  workoutLogs: 'workout_logs',
+  spiritSessions: 'spirit_sessions',
+  spiritStreak: 'spirit_streak',
+}
+
 export function useStorage(key, defaultValue) {
   const [value, setValue] = useState(() => {
     try {

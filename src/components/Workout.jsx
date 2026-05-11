@@ -367,8 +367,8 @@ function ExerciseRow({ ex, isVariant = false, progId, logs, setLogs, today, last
 }
 
 export default function Workout() {
-  const [programs, setPrograms] = useStorage('workout_programs_v2', defaultPrograms)
-  const [logs, setLogs] = useStorage('workout_logs_v2', {})
+  const [programs, setPrograms] = useStorage('workout_programs', defaultPrograms)
+const [logs, setLogs] = useStorage('workout_logs', {})
   const [selected, setSelected] = useState(null)
   const [allCharts, setAllCharts] = useState(null)
 
