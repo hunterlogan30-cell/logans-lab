@@ -1,0 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  height: 100%;
+  background: #121B2E;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  min-height: 100%;
+  min-height: 100dvh;
+  background: linear-gradient(180deg, #121B2E 0%, #5652E9 100%);
+  background-attachment: fixed;
+  color: #fff;
+  overscroll-behavior: none;
+}
+
+#root {
+  max-width: 448px;
+  margin: 0 auto;
+  min-height: 100dvh;
+}
+html {
+  touch-action: manipulation;
+}
+
+* {
+  touch-action: manipulation;
+}
+input, textarea, select {
+  font-size: 16px !important;
+}
