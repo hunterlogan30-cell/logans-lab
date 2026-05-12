@@ -196,27 +196,54 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
   return (
     <div style={{ borderRadius: isVariant ? '14px' : '18px', background: exLog.done ? 'rgba(16,185,129,0.08)' : isVariant ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)', border: `1px solid ${exLog.done ? 'rgba(16,185,129,0.25)' : isVariant ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.15)'}`, overflow: 'hidden', transition: 'all 0.2s' }}>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: isVariant ? '11px 14px' : '14px 16px', cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: isVariant ? '11px 14px' : '14px 16px' }}>
         {isVariant && <div style={{ width: '2px', height: '28px', background: 'rgba(99,102,241,0.4)', borderRadius: '1px', flexShrink: 0 }} />}
-        <div onClick={e => { e.stopPropagation(); toggleDone() }} style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, cursor: 'pointer', background: exLog.done ? '#10B981' : 'rgba(255,255,255,0.1)', border: `2px solid ${exLog.done ? '#10B981' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+
+        {/* Done circle */}
+        <div onClick={toggleDone} style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, cursor: 'pointer', background: exLog.done ? '#10B981' : 'rgba(255,255,255,0.1)', border: `2px solid ${exLog.done ? '#10B981' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {exLog.done && <CheckIcon />}
         </div>
-        <p style={{ fontSize: isVariant ? '13px' : '14px', fontWeight: '500', flex: 1, color: exLog.done ? 'rgba(255,255,255,0.4)' : '#fff', textDecoration: exLog.done ? 'line-through' : 'none' }}>{ex.name}</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+
+        {/* Name — tapping expands */}
+        <p onClick={() => setExpanded(!expanded)} style={{ fontSize: isVariant ? '13px' : '14px', fontWeight: '500', flex: 1, cursor: 'pointer', color: exLog.done ? 'rgba(255,255,255,0.4)' : '#fff', textDecoration: exLog.done ? 'line-through' : 'none' }}>{ex.name}</p>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* Similar pill — only if variants exist */}
           {!isVariant && ex.variants?.length > 0 && (
-            <div onClick={e => { e.stopPropagation(); setVariantsOpen(!variantsOpen) }} style={{ fontSize: '10px', fontWeight: '500', color: 'rgba(199,200,255,0.7)', background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '10px', padding: '2px 8px', cursor: 'pointer' }}>
+            <div onClick={() => setVariantsOpen(!variantsOpen)} style={{ fontSize: '10px', fontWeight: '500', color: 'rgba(199,200,255,0.7)', background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '10px', padding: '2px 8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               {ex.variants.length} similar
             </div>
           )}
+
+          {/* + button to add similar — always visible on top-level */}
+          {!isVariant && (
+            <button
+              onClick={e => { e.stopPropagation(); onAddVariant(ex.id); setVariantsOpen(true) }}
+              style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              title="Add similar exercise"
+            >
+              <PlusIcon size={10} />
+            </button>
+          )}
+
+          {/* Edit */}
           <button onClick={e => { e.stopPropagation(); onEdit(e, ex) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '4px' }}>
             <EditIcon />
           </button>
-          {expanded ? <ChevronUp /> : <ChevronDown />}
+
+          {/* Expand chevron */}
+          <div onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
+            {expanded ? <ChevronUp /> : <ChevronDown />}
+          </div>
         </div>
       </div>
 
+      {/* Expanded detail */}
       {expanded && (
         <div style={{ padding: '0 16px 14px', paddingLeft: isVariant ? '32px' : '16px' }}>
+
+          {/* Targets */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             {[{ label: 'Sets', value: ex.sets }, { label: 'Reps', value: ex.reps }, { label: 'Target', value: ex.weight > 0 ? `${ex.weight} lbs` : '—' }].map(s => (
               <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '8px 10px' }}>
@@ -226,6 +253,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             ))}
           </div>
 
+          {/* Last week */}
           {(lwLog.weight_used || lwLog.reps_done) && (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px', padding: '8px 12px', borderRadius: '10px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(199,200,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -235,6 +263,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             </div>
           )}
 
+          {/* Log inputs */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
             <div>
               <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '5px' }}>Weight (lbs)</label>
@@ -252,6 +281,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             </div>
           </div>
 
+          {/* Progress chart toggle */}
           <button onClick={() => setAllCharts(isChartOpen ? null : chartKey)} style={{ width: '100%', padding: '8px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             {isChartOpen ? 'Hide progress' : 'View progress'}
@@ -269,6 +299,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
         </div>
       )}
 
+      {/* Variants list */}
       {!isVariant && variantsOpen && ex.variants?.length > 0 && (
         <div style={{ padding: '0 12px 12px 36px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -277,19 +308,12 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             <div style={{ height: '1px', flex: 1, background: 'rgba(255,255,255,0.08)' }} />
           </div>
           {ex.variants.map(v => (
-            <ExerciseRow key={v.id} ex={v} isVariant todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
-              onEdit={onEdit} onAddVariant={onAddVariant} allCharts={allCharts} setAllCharts={setAllCharts}
+            <ExerciseRow key={v.id} ex={v} isVariant
+              todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
+              onEdit={onEdit} onAddVariant={onAddVariant}
+              allCharts={allCharts} setAllCharts={setAllCharts}
               onLogChange={onLogChange} chartData={chartData} />
           ))}
-        </div>
-      )}
-
-      {!isVariant && variantsOpen && (
-        <div style={{ padding: '0 12px 12px 36px' }}>
-          <button onClick={() => onAddVariant(ex.id)} style={{ width: '100%', padding: '9px', borderRadius: '12px', cursor: 'pointer', background: 'transparent', border: '1px dashed rgba(99,102,241,0.35)', color: 'rgba(199,200,255,0.6)', fontSize: '12px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-            <PlusIcon size={12} />
-            Add similar exercise
-          </button>
         </div>
       )}
     </div>
