@@ -252,6 +252,22 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
               </div>
             ))}
           </div>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+  {[{ label: 'Sets', value: ex.sets }, { label: 'Reps', value: ex.reps }, { label: 'Target', value: ex.weight > 0 ? `${ex.weight} lbs` : '—' }].map(s => (
+    <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '8px 10px' }}>
+      <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', marginBottom: '3px' }}>{s.label}</p>
+      <p style={{ fontSize: '13px', fontWeight: '600', color: 'rgba(255,255,255,0.8)' }}>{s.value}</p>
+    </div>
+  ))}
+</div>
+
+{/* ADD THIS RIGHT HERE */}
+{ex.notes && (
+  <div style={{ marginBottom: '12px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px', fontWeight: '500' }}>NOTES</p>
+    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', lineHeight: '1.6' }}>{ex.notes}</p>
+  </div>
+)}
 
           {/* Last week */}
           {(lwLog.weight_used || lwLog.reps_done) && (
@@ -334,7 +350,7 @@ export default function Workout() {
   const [editingEx, setEditingEx] = useState(null)
   const [addingVariantFor, setAddingVariantFor] = useState(null)
   const [progForm, setProgForm] = useState({ name: '', tag: 'Strength' })
-  const [exForm, setExForm] = useState({ name: '', sets: '', reps: '', weight: '' })
+  const [exForm, setExForm] = useState({ name: '', sets: '', reps: '', weight: '', notes: '' })
 
   const today = new Date().toISOString().split('T')[0]
   const lastWeek = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
@@ -458,7 +474,7 @@ export default function Workout() {
     e.stopPropagation()
     setEditingEx(ex)
     setAddingVariantFor(null)
-    setExForm({ name: ex.name, sets: String(ex.sets), reps: ex.reps, weight: String(ex.weight) })
+    setExForm({ name: ex.name, sets: String(ex.sets), reps: ex.reps, weight: String(ex.weight), notes: ex.notes || '' })
     setShowExModal(true)
   }
 
@@ -471,7 +487,7 @@ export default function Workout() {
 
   const saveEx = async () => {
     if (!exForm.name.trim()) return
-    const built = { name: exForm.name, sets: parseInt(exForm.sets) || 1, reps: exForm.reps, weight: exForm.weight }
+    const built = { name: exForm.name, sets: parseInt(exForm.sets) || 1, reps: exForm.reps, weight: exForm.weight, notes: exForm.notes }
 
     if (editingEx) {
       await supabase.from('exercises').update(built).eq('id', editingEx.id)
@@ -591,6 +607,25 @@ export default function Workout() {
               <div><label style={labelStyle}>Reps</label><input style={inputStyle} placeholder="8–10" value={exForm.reps} onChange={e => setExForm(f => ({ ...f, reps: e.target.value }))} /></div>
               <div><label style={labelStyle}>Weight (lbs)</label><input style={inputStyle} type="number" placeholder="135" value={exForm.weight} onChange={e => setExForm(f => ({ ...f, weight: e.target.value }))} /></div>
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+  <div><label style={labelStyle}>Sets</label><input style={inputStyle} type="number" placeholder="4" value={exForm.sets} onChange={e => setExForm(f => ({ ...f, sets: e.target.value }))} /></div>
+  <div><label style={labelStyle}>Reps</label><input style={inputStyle} placeholder="8–10" value={exForm.reps} onChange={e => setExForm(f => ({ ...f, reps: e.target.value }))} /></div>
+  <div><label style={labelStyle}>Weight (lbs)</label><input style={inputStyle} type="number" placeholder="135" value={exForm.weight} onChange={e => setExForm(f => ({ ...f, weight: e.target.value }))} /></div>
+</div>
+
+{/* ADD THIS RIGHT HERE */}
+<div>
+  <label style={labelStyle}>Notes</label>
+  <textarea
+    placeholder="e.g. Drop set on last set, reduce by 20%. Rest 3 min between sets."
+    value={exForm.notes}
+    onChange={e => setExForm(f => ({ ...f, notes: e.target.value }))}
+    rows={3}
+    style={{ ...inputStyle, resize: 'none', lineHeight: '1.6', padding: '12px', fontSize: '14px' }}
+  />
+</div>
+
+<button onClick={saveEx} style={{ ...btnPrimary, marginTop: '4px' }}>{editingEx ? 'Save changes' : 'Add exercise'}</button>
             <button onClick={saveEx} style={{ ...btnPrimary, marginTop: '4px' }}>{editingEx ? 'Save changes' : 'Add exercise'}</button>
             {editingEx && <button onClick={deleteEx} style={{ ...btnSecondary, color: 'rgba(255,100,100,0.8)', border: '1px solid rgba(255,100,100,0.2)' }}>Delete exercise</button>}
           </div>
