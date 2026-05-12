@@ -16,6 +16,12 @@ const HeartIcon = () => (
     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
   </svg>
 )
+const ScaleIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3a1 1 0 0 0 0 2 1 1 0 0 0 0-2z" fill="white"/>
+    <path d="M5 21h14M12 5v4M5 10l7-2 7 2M5 10c0 4 3 7 7 7s7-3 7-7"/>
+  </svg>
+)
 const ChevronDown = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="6 9 12 15 18 9"/>
@@ -42,21 +48,29 @@ const PlusIcon = ({ size = 16 }) => (
     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
   </svg>
 )
+const DragIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round">
+    <line x1="8" y1="6" x2="16" y2="6"/>
+    <line x1="8" y1="12" x2="16" y2="12"/>
+    <line x1="8" y1="18" x2="16" y2="18"/>
+  </svg>
+)
 
-function ProgressChart({ data }) {
+// ── Progress chart (shared) ──────────────────────────────────────────────────
+function ProgressChart({ data, unit = 'lbs' }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
   const dprRef = useRef(1)
   const [tooltip, setTooltip] = useState(null)
-  const PAD = { L: 40, R: 12, T: 16, B: 36 }
+  const PAD = { L: 44, R: 12, T: 16, B: 36 }
 
   const getPoints = (W, H) => {
     if (!data || data.length < 2) return []
     const chartW = W - PAD.L - PAD.R
     const chartH = H - PAD.T - PAD.B
     const vals = data.map(d => parseFloat(d.value) || 0)
-    const min = Math.max(0, Math.min(...vals) * 0.9)
-    const max = Math.max(...vals) * 1.1 || 100
+    const min = Math.max(0, Math.min(...vals) * 0.97)
+    const max = Math.max(...vals) * 1.03 || 100
     return data.map((d, i) => ({
       x: PAD.L + (i / Math.max(data.length - 1, 1)) * chartW,
       y: PAD.T + chartH - ((vals[i] - min) / (max - min || 1)) * chartH,
@@ -70,7 +84,7 @@ function ProgressChart({ data }) {
     const dpr = window.devicePixelRatio || 1
     dprRef.current = dpr
     const cssW = canvas.offsetWidth || 340
-    const cssH = 140
+    const cssH = 160
     canvas.width = cssW * dpr
     canvas.height = cssH * dpr
     canvas.style.width = cssW + 'px'
@@ -91,13 +105,13 @@ function ProgressChart({ data }) {
     if (pts.length < 2) return
 
     const vals = data.map(d => parseFloat(d.value) || 0)
-    const minV = Math.max(0, Math.min(...vals) * 0.9)
-    const maxV = Math.max(...vals) * 1.1 || 100
+    const minV = Math.max(0, Math.min(...vals) * 0.97)
+    const maxV = Math.max(...vals) * 1.03 || 100
 
     ctx.font = '10px Inter, sans-serif'
     ctx.textAlign = 'right'
     ;[0, 0.5, 1].forEach(pct => {
-      const v = Math.round(minV + pct * (maxV - minV))
+      const v = (minV + pct * (maxV - minV)).toFixed(1)
       const y = PAD.T + chartH - pct * chartH
       ctx.fillStyle = 'rgba(255,255,255,0.35)'
       ctx.fillText(v, PAD.L - 5, y + 4)
@@ -166,7 +180,7 @@ function ProgressChart({ data }) {
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       {tooltip && (
         <div style={{ position: 'absolute', top: '-8px', left: tooltip.x, transform: 'translateX(-50%)', background: 'rgba(255,255,255,0.95)', color: '#1a1a2e', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', fontWeight: '600', fontFamily: 'Inter, sans-serif', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10 }}>
-          {tooltip.label}: {tooltip.value} lbs
+          {tooltip.label}: {tooltip.value} {unit}
           <div style={{ position: 'absolute', bottom: '-4px', left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '4px solid rgba(255,255,255,0.95)' }} />
         </div>
       )}
@@ -181,7 +195,157 @@ function ProgressChart({ data }) {
   )
 }
 
-function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData }) {
+// ── Body weight section ──────────────────────────────────────────────────────
+function BodyWeightSection() {
+  const [logs, setLogs] = useState([])
+  const [todayLog, setTodayLog] = useState(null)
+  const [weight, setWeight] = useState('')
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [range, setRange] = useState('month')
+  const today = new Date().toISOString().split('T')[0]
+
+  useEffect(() => { loadLogs() }, [])
+
+  const loadLogs = async () => {
+    const { data } = await supabase.from('body_weight_logs').select('*').order('logged_date')
+    setLogs(data || [])
+    const td = data?.find(l => l.logged_date === today)
+    if (td) { setTodayLog(td); setWeight(String(td.weight_lbs)); setNotes(td.notes || '') }
+  }
+
+  const save = async () => {
+    if (!weight) return
+    setSaving(true)
+    if (todayLog) {
+      await supabase.from('body_weight_logs').update({ weight_lbs: parseFloat(weight), notes }).eq('id', todayLog.id)
+    } else {
+      await supabase.from('body_weight_logs').insert({ logged_date: today, weight_lbs: parseFloat(weight), notes })
+    }
+    await loadLogs()
+    setSaving(false)
+  }
+
+  const filtered = (() => {
+    const now = new Date()
+    const cutoff = new Date()
+    if (range === 'week') cutoff.setDate(now.getDate() - 7)
+    else if (range === 'month') cutoff.setDate(now.getDate() - 30)
+    else if (range === '3month') cutoff.setDate(now.getDate() - 90)
+    else return logs
+    return logs.filter(l => new Date(l.logged_date) >= cutoff)
+  })()
+
+  const chartData = filtered.map(l => ({
+    label: new Date(l.logged_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    value: String(l.weight_lbs),
+  }))
+
+  const latest = logs[logs.length - 1]
+  const prev = logs[logs.length - 2]
+  const diff = latest && prev ? (parseFloat(latest.weight_lbs) - parseFloat(prev.weight_lbs)).toFixed(1) : null
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+      {/* Log today */}
+      <div style={{ ...glass, padding: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Log Today's Weight</h3>
+          {latest && (
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '20px', fontWeight: '700' }}>{latest.weight_lbs} <span style={{ fontSize: '13px', fontWeight: '400', color: 'rgba(255,255,255,0.5)' }}>lbs</span></p>
+              {diff !== null && (
+                <p style={{ fontSize: '12px', color: parseFloat(diff) <= 0 ? '#10B981' : 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
+                  {parseFloat(diff) > 0 ? '+' : ''}{diff} lbs
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px', marginBottom: '10px' }}>
+          <div>
+            <label style={labelStyle}>Weight (lbs)</label>
+            <input type="number" placeholder="185" value={weight} onChange={e => setWeight(e.target.value)}
+              style={{ ...inputStyle, fontSize: '16px' }} />
+          </div>
+          <div>
+            <label style={labelStyle}>Notes (optional)</label>
+            <input type="text" placeholder="e.g. morning, fasted" value={notes} onChange={e => setNotes(e.target.value)}
+              style={{ ...inputStyle, fontSize: '16px' }} />
+          </div>
+        </div>
+        <button onClick={save} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}>
+          {saving ? 'Saving...' : todayLog ? 'Update' : 'Log weight'}
+        </button>
+      </div>
+
+      {/* Chart */}
+      {logs.length >= 2 && (
+        <div style={{ ...glass, padding: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Progress</h3>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {[['week', '1W'], ['month', '1M'], ['3month', '3M'], ['all', 'All']].map(([val, label]) => (
+                <button key={val} onClick={() => setRange(val)} style={{ padding: '4px 10px', borderRadius: '10px', cursor: 'pointer', background: range === val ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)', border: `1px solid ${range === val ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.15)'}`, color: range === val ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: '11px', fontFamily: 'Inter, sans-serif' }}>{label}</button>
+              ))}
+            </div>
+          </div>
+          {chartData.length >= 2
+            ? <ProgressChart data={chartData} unit="lbs" />
+            : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '20px 0' }}>Log more days to see your chart.</p>
+          }
+
+          {/* Stats row */}
+          {filtered.length >= 2 && (() => {
+            const vals = filtered.map(l => parseFloat(l.weight_lbs))
+            const start = vals[0], end = vals[vals.length - 1]
+            const total = (end - start).toFixed(1)
+            const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)
+            const low = Math.min(...vals).toFixed(1)
+            const high = Math.max(...vals).toFixed(1)
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px', marginTop: '14px' }}>
+                {[
+                  { label: 'Change', value: `${parseFloat(total) > 0 ? '+' : ''}${total}`, color: parseFloat(total) <= 0 ? '#10B981' : 'rgba(255,255,255,0.8)' },
+                  { label: 'Average', value: avg },
+                  { label: 'Low', value: low },
+                  { label: 'High', value: high },
+                ].map(s => (
+                  <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '3px' }}>{s.label}</p>
+                    <p style={{ fontSize: '14px', fontWeight: '600', color: s.color || '#fff' }}>{s.value}</p>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
+      {/* Log history */}
+      {logs.length > 0 && (
+        <div style={{ ...glass, padding: '20px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>History</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '240px', overflowY: 'auto' }}>
+            {[...logs].reverse().map(l => (
+              <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: '12px', background: l.logged_date === today ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${l.logged_date === today ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.08)'}` }}>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: '500', color: '#fff' }}>{new Date(l.logged_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                  {l.notes && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>{l.notes}</p>}
+                </div>
+                <p style={{ fontSize: '16px', fontWeight: '700' }}>{l.weight_lbs} <span style={{ fontSize: '12px', fontWeight: '400', color: 'rgba(255,255,255,0.4)' }}>lbs</span></p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Draggable exercise row ───────────────────────────────────────────────────
+function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, dragHandleProps }) {
   const [expanded, setExpanded] = useState(false)
   const [variantsOpen, setVariantsOpen] = useState(false)
 
@@ -192,15 +356,23 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
   const isChartOpen = allCharts === chartKey
 
   return (
-    <div style={{ borderRadius: isVariant ? '14px' : '18px', background: exLog.done ? 'rgba(16,185,129,0.08)' : isVariant ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)', border: `1px solid ${exLog.done ? 'rgba(16,185,129,0.25)' : isVariant ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.15)'}`, overflow: 'hidden', transition: 'all 0.2s' }}>
+    <div style={{ borderRadius: isVariant ? '14px' : '18px', background: exLog.done ? 'rgba(16,185,129,0.08)' : isVariant ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)', border: `1px solid ${exLog.done ? 'rgba(16,185,129,0.25)' : isVariant ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.15)'}`, overflow: 'hidden', transition: 'background 0.2s, border 0.2s' }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: isVariant ? '11px 14px' : '14px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: isVariant ? '11px 14px' : '14px 16px' }}>
+        {/* Drag handle — top level only */}
+        {!isVariant && (
+          <div {...dragHandleProps} style={{ cursor: 'grab', padding: '4px 2px', color: 'rgba(255,255,255,0.2)', touchAction: 'none' }}>
+            <DragIcon />
+          </div>
+        )}
         {isVariant && <div style={{ width: '2px', height: '28px', background: 'rgba(99,102,241,0.4)', borderRadius: '1px', flexShrink: 0 }} />}
+
         <div onClick={toggleDone} style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, cursor: 'pointer', background: exLog.done ? '#10B981' : 'rgba(255,255,255,0.1)', border: `2px solid ${exLog.done ? '#10B981' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {exLog.done && <CheckIcon />}
         </div>
+
         <p onClick={() => setExpanded(!expanded)} style={{ fontSize: isVariant ? '13px' : '14px', fontWeight: '500', flex: 1, cursor: 'pointer', color: exLog.done ? 'rgba(255,255,255,0.4)' : '#fff', textDecoration: exLog.done ? 'line-through' : 'none' }}>{ex.name}</p>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           {!isVariant && ex.variants?.length > 0 && (
             <div onClick={() => setVariantsOpen(!variantsOpen)} style={{ fontSize: '10px', fontWeight: '500', color: 'rgba(199,200,255,0.7)', background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '10px', padding: '2px 8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
@@ -221,11 +393,8 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
         </div>
       </div>
 
-      {/* Expanded detail */}
       {expanded && (
         <div style={{ padding: '0 16px 14px', paddingLeft: isVariant ? '32px' : '16px' }}>
-
-          {/* Targets */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             {[{ label: 'Sets', value: ex.sets }, { label: 'Reps', value: ex.reps }, { label: 'Target', value: ex.weight > 0 ? `${ex.weight} lbs` : '—' }].map(s => (
               <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '8px 10px' }}>
@@ -235,7 +404,6 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             ))}
           </div>
 
-          {/* Notes */}
           {ex.notes && (
             <div style={{ marginBottom: '12px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px', fontWeight: '500' }}>NOTES</p>
@@ -243,7 +411,6 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             </div>
           )}
 
-          {/* Last week */}
           {(lwLog.weight_used || lwLog.reps_done) && (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px', padding: '8px 12px', borderRadius: '10px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(199,200,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -253,7 +420,6 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             </div>
           )}
 
-          {/* Log inputs */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
             <div>
               <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '5px' }}>Weight (lbs)</label>
@@ -271,7 +437,6 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             </div>
           </div>
 
-          {/* Progress chart */}
           <button onClick={() => setAllCharts(isChartOpen ? null : chartKey)} style={{ width: '100%', padding: '8px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             {isChartOpen ? 'Hide progress' : 'View progress'}
@@ -281,7 +446,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             <div style={{ marginTop: '10px', padding: '14px', background: 'rgba(255,255,255,0.04)', borderRadius: '12px' }}>
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px' }}>Weight over time (lbs)</p>
               {chartData && chartData.length >= 2
-                ? <ProgressChart data={chartData} />
+                ? <ProgressChart data={chartData} unit="lbs" />
                 : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>Log 2+ sessions to see your chart.</p>
               }
             </div>
@@ -289,7 +454,6 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
         </div>
       )}
 
-      {/* Variants */}
       {!isVariant && variantsOpen && ex.variants?.length > 0 && (
         <div style={{ padding: '0 12px 12px 36px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -310,6 +474,86 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
   )
 }
 
+// ── Drag-sortable exercise list ──────────────────────────────────────────────
+function SortableExerciseList({ exercises, progId, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, onReorder }) {
+  const [items, setItems] = useState(exercises)
+  const dragIdx = useRef(null)
+  const dragOverIdx = useRef(null)
+
+  useEffect(() => { setItems(exercises) }, [exercises])
+
+  const handleDragStart = (i) => { dragIdx.current = i }
+  const handleDragEnter = (i) => { dragOverIdx.current = i }
+
+  const handleDragEnd = async () => {
+    const from = dragIdx.current
+    const to = dragOverIdx.current
+    if (from === null || to === null || from === to) { dragIdx.current = null; dragOverIdx.current = null; return }
+    const next = [...items]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    setItems(next)
+    dragIdx.current = null; dragOverIdx.current = null
+    onReorder(next)
+    // Save new order to Supabase
+    await Promise.all(next.map((ex, idx) => supabase.from('exercises').update({ sort_order: idx }).eq('id', ex.id)))
+  }
+
+  // Touch drag
+  const touchStartY = useRef(null)
+  const touchDragIdx = useRef(null)
+  const itemHeight = useRef(72)
+
+  const handleTouchStart = (e, i) => {
+    touchStartY.current = e.touches[0].clientY
+    touchDragIdx.current = i
+    dragIdx.current = i
+  }
+
+  const handleTouchMove = (e) => {
+    if (touchDragIdx.current === null) return
+    const y = e.touches[0].clientY
+    const diff = y - touchStartY.current
+    const newIdx = Math.max(0, Math.min(items.length - 1, touchDragIdx.current + Math.round(diff / itemHeight.current)))
+    dragOverIdx.current = newIdx
+  }
+
+  const handleTouchEnd = () => { handleDragEnd() }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {items.map((ex, i) => (
+        <div key={ex.id}
+          draggable
+          onDragStart={() => handleDragStart(i)}
+          onDragEnter={() => handleDragEnter(i)}
+          onDragEnd={handleDragEnd}
+          onDragOver={e => e.preventDefault()}
+          style={{ transition: 'transform 0.15s' }}
+        >
+          <ExerciseRow
+            ex={ex}
+            todayLogs={todayLogs}
+            lastWeekLogs={lastWeekLogs}
+            onEdit={onEdit}
+            onAddVariant={onAddVariant}
+            allCharts={allCharts}
+            setAllCharts={setAllCharts}
+            onLogChange={onLogChange}
+            chartData={chartData[ex.id]}
+            dragHandleProps={{
+              onTouchStart: e => handleTouchStart(e, i),
+              onTouchMove: handleTouchMove,
+              onTouchEnd: handleTouchEnd,
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Main Workout component ───────────────────────────────────────────────────
 export default function Workout() {
   const [programs, setPrograms] = useState([])
   const [todayLogs, setTodayLogs] = useState({})
@@ -318,6 +562,7 @@ export default function Workout() {
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
   const [allCharts, setAllCharts] = useState(null)
+  const [activeTab, setActiveTab] = useState('workout') // 'workout' | 'weight'
   const [showAddProg, setShowAddProg] = useState(false)
   const [showExModal, setShowExModal] = useState(false)
   const [editingProg, setEditingProg] = useState(null)
@@ -344,27 +589,14 @@ export default function Workout() {
       const topLevel = []
       exs?.forEach(e => { exerciseMap[e.id] = { ...e, variants: [] } })
       exs?.forEach(e => {
-        if (e.parent_id) {
-          if (exerciseMap[e.parent_id]) exerciseMap[e.parent_id].variants.push(exerciseMap[e.id])
-        } else {
-          topLevel.push(exerciseMap[e.id])
-        }
+        if (e.parent_id) { if (exerciseMap[e.parent_id]) exerciseMap[e.parent_id].variants.push(exerciseMap[e.id]) }
+        else topLevel.push(exerciseMap[e.id])
       })
 
-      const builtProgs = progs?.map(p => ({
-        ...p,
-        exercises: topLevel.filter(e => e.program_id === p.id)
-      })) || []
+      setPrograms(progs?.map(p => ({ ...p, exercises: topLevel.filter(e => e.program_id === p.id) })) || [])
 
-      setPrograms(builtProgs)
-
-      const tMap = {}
-      tLogs?.forEach(l => { tMap[l.exercise_id] = l })
-      setTodayLogs(tMap)
-
-      const lwMap = {}
-      lwLogs?.forEach(l => { lwMap[l.exercise_id] = l })
-      setLastWeekLogs(lwMap)
+      const tMap = {}; tLogs?.forEach(l => { tMap[l.exercise_id] = l }); setTodayLogs(tMap)
+      const lwMap = {}; lwLogs?.forEach(l => { lwMap[l.exercise_id] = l }); setLastWeekLogs(lwMap)
 
       const cMap = {}
       allLogs?.forEach(l => {
@@ -376,7 +608,6 @@ export default function Workout() {
         })
       })
       setChartData(cMap)
-
     } catch (e) { console.error(e) }
     setLoading(false)
   }
@@ -386,76 +617,53 @@ export default function Workout() {
   const donePct = (() => {
     if (!prog) return 0
     const allExIds = prog.exercises.flatMap(e => [e.id, ...(e.variants || []).map(v => v.id)])
-    const doneCount = allExIds.filter(id => todayLogs[id]?.done).length
-    return Math.round(doneCount / Math.max(allExIds.length, 1) * 100)
+    return Math.round(allExIds.filter(id => todayLogs[id]?.done).length / Math.max(allExIds.length, 1) * 100)
   })()
 
   const handleLogChange = async (exId, field, value) => {
-    setTodayLogs(prev => ({
-      ...prev,
-      [exId]: { ...(prev[exId] || {}), [field]: value, exercise_id: exId }
-    }))
+    setTodayLogs(prev => ({ ...prev, [exId]: { ...(prev[exId] || {}), [field]: value, exercise_id: exId } }))
     const existing = todayLogs[exId]
     if (existing?.id) {
       await supabase.from('workout_logs').update({ [field]: value }).eq('id', existing.id)
     } else {
-      const { data } = await supabase.from('workout_logs').insert({
-        exercise_id: exId, logged_date: today, [field]: value
-      }).select().single()
+      const { data } = await supabase.from('workout_logs').insert({ exercise_id: exId, logged_date: today, [field]: value }).select().single()
       if (data) setTodayLogs(prev => ({ ...prev, [exId]: data }))
     }
   }
 
   const openAddProg = () => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setShowAddProg(true) }
   const openEditProg = (e, p) => { e.stopPropagation(); setEditingProg(p); setProgForm({ name: p.name, tag: p.tag }); setShowAddProg(true) }
-
   const saveProg = async () => {
     if (!progForm.name.trim()) return
-    if (editingProg) { await supabase.from('programs').update(progForm).eq('id', editingProg.id) }
-    else { await supabase.from('programs').insert(progForm) }
-    setShowAddProg(false)
-    loadAll()
+    if (editingProg) await supabase.from('programs').update(progForm).eq('id', editingProg.id)
+    else await supabase.from('programs').insert(progForm)
+    setShowAddProg(false); loadAll()
   }
-
   const deleteProg = async () => {
     await supabase.from('programs').delete().eq('id', editingProg.id)
     setSelected(null); setShowAddProg(false); loadAll()
   }
 
   const openAddEx = () => { setEditingEx(null); setAddingVariantFor(null); setExForm({ name: '', sets: '', reps: '', weight: '', notes: '' }); setShowExModal(true) }
-
   const openEditEx = (e, ex) => {
-    e.stopPropagation()
-    setEditingEx(ex); setAddingVariantFor(null)
+    e.stopPropagation(); setEditingEx(ex); setAddingVariantFor(null)
     setExForm({ name: ex.name, sets: String(ex.sets), reps: ex.reps, weight: String(ex.weight), notes: ex.notes || '' })
     setShowExModal(true)
   }
-
-  const openAddVariant = (parentExId) => {
-    setEditingEx(null); setAddingVariantFor(parentExId)
-    setExForm({ name: '', sets: '', reps: '', weight: '', notes: '' })
-    setShowExModal(true)
-  }
-
+  const openAddVariant = (parentExId) => { setEditingEx(null); setAddingVariantFor(parentExId); setExForm({ name: '', sets: '', reps: '', weight: '', notes: '' }); setShowExModal(true) }
   const saveEx = async () => {
     if (!exForm.name.trim()) return
     const built = { name: exForm.name, sets: parseInt(exForm.sets) || 1, reps: exForm.reps, weight: exForm.weight, notes: exForm.notes }
-    if (editingEx) {
-      await supabase.from('exercises').update(built).eq('id', editingEx.id)
-    } else if (addingVariantFor) {
-      await supabase.from('exercises').insert({ ...built, program_id: selected, parent_id: addingVariantFor })
-    } else {
-      await supabase.from('exercises').insert({ ...built, program_id: selected })
-    }
+    if (editingEx) await supabase.from('exercises').update(built).eq('id', editingEx.id)
+    else if (addingVariantFor) await supabase.from('exercises').insert({ ...built, program_id: selected, parent_id: addingVariantFor })
+    else await supabase.from('exercises').insert({ ...built, program_id: selected })
     setShowExModal(false); loadAll()
   }
+  const deleteEx = async () => { await supabase.from('exercises').delete().eq('id', editingEx.id); setShowExModal(false); loadAll() }
 
-  const deleteEx = async () => {
-    await supabase.from('exercises').delete().eq('id', editingEx.id)
-    setShowExModal(false); loadAll()
+  const handleReorder = (newOrder) => {
+    setPrograms(ps => ps.map(p => p.id === selected ? { ...p, exercises: newOrder } : p))
   }
-
-  const modalTitle = editingEx ? (editingEx.parent_id ? 'Edit similar exercise' : 'Edit exercise') : addingVariantFor ? 'Add similar exercise' : 'Add exercise'
 
   if (loading) return (
     <div style={{ padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px' }}>
@@ -468,64 +676,95 @@ export default function Workout() {
   return (
     <div style={{ padding: '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: '700' }}>Workout</h1>
-          <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginTop: '4px' }}>Select today's program</p>
+          <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginTop: '4px' }}>
+            {activeTab === 'workout' ? "Select today's program" : 'Track your body weight'}
+          </p>
         </div>
-        <button onClick={openAddProg} style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #4F46E5)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <PlusIcon />
-        </button>
+        {activeTab === 'workout' && (
+          <button onClick={openAddProg} style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #4F46E5)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <PlusIcon />
+          </button>
+        )}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {programs.map(p => (
-          <button key={p.id} onClick={() => setSelected(p.id === selected ? null : p.id)} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '20px', cursor: 'pointer', background: selected === p.id ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.08)', border: `1px solid ${selected === p.id ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.15)'}`, fontFamily: 'Inter, sans-serif', textAlign: 'left', transition: 'all 0.2s' }}>
-            <div style={iconBg}>{p.tag === 'Cardio' ? <HeartIcon /> : <DumbbellIcon />}</div>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: '15px', fontWeight: '600', color: '#fff' }}>{p.name}</p>
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{p.exercises?.length || 0} exercises · {p.tag}</p>
-            </div>
-            <button onClick={e => openEditProg(e, p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '4px' }}>
-              <EditIcon />
-            </button>
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '16px', padding: '4px' }}>
+        {[
+          { id: 'workout', label: 'Training', icon: <DumbbellIcon /> },
+          { id: 'weight', label: 'Body Weight', icon: <ScaleIcon /> },
+        ].map(t => (
+          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', borderRadius: '12px', cursor: 'pointer', background: activeTab === t.id ? 'rgba(99,102,241,0.4)' : 'transparent', border: `1px solid ${activeTab === t.id ? 'rgba(99,102,241,0.5)' : 'transparent'}`, color: activeTab === t.id ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '500', fontFamily: 'Inter, sans-serif', transition: 'all 0.2s' }}>
+            {t.icon}
+            {t.label}
           </button>
         ))}
       </div>
 
-      {selected && prog && (
+      {/* Body weight tab */}
+      {activeTab === 'weight' && <BodyWeightSection />}
+
+      {/* Training tab */}
+      {activeTab === 'workout' && (
         <>
-          <div style={{ ...glass, padding: '18px 20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>{prog.name}</span>
-              <span style={{ fontSize: '14px', color: '#10B981', fontWeight: '600' }}>{donePct}%</span>
-            </div>
-            <div style={{ height: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${donePct}%`, background: 'linear-gradient(90deg, #6366F1, #10B981)', borderRadius: '3px', transition: 'width 0.3s' }} />
-            </div>
-          </div>
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {prog.exercises.map(ex => (
-              <ExerciseRow key={ex.id} ex={ex}
-                todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
-                onEdit={openEditEx} onAddVariant={openAddVariant}
-                allCharts={allCharts} setAllCharts={setAllCharts}
-                onLogChange={handleLogChange} chartData={chartData[ex.id]} />
+            {programs.map(p => (
+              <button key={p.id} onClick={() => setSelected(p.id === selected ? null : p.id)} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '20px', cursor: 'pointer', background: selected === p.id ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.08)', border: `1px solid ${selected === p.id ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.15)'}`, fontFamily: 'Inter, sans-serif', textAlign: 'left', transition: 'all 0.2s' }}>
+                <div style={iconBg}>{p.tag === 'Cardio' ? <HeartIcon /> : <DumbbellIcon />}</div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: '15px', fontWeight: '600', color: '#fff' }}>{p.name}</p>
+                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{p.exercises?.length || 0} exercises · {p.tag}</p>
+                </div>
+                <button onClick={e => openEditProg(e, p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '4px' }}>
+                  <EditIcon />
+                </button>
+              </button>
             ))}
-            <button onClick={openAddEx} style={{ padding: '14px', borderRadius: '18px', cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.4)', fontSize: '14px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-              <PlusIcon /> Add exercise
-            </button>
           </div>
 
-          {donePct === 100 && (
-            <div style={{ ...glass, padding: '20px', textAlign: 'center', background: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)' }}>
-              <div style={{ ...iconBg, margin: '0 auto 12px', background: 'linear-gradient(135deg, #10B981, #059669)' }}>
-                <CheckIcon />
+          {selected && prog && (
+            <>
+              <div style={{ ...glass, padding: '18px 20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600' }}>{prog.name}</span>
+                  <span style={{ fontSize: '14px', color: '#10B981', fontWeight: '600' }}>{donePct}%</span>
+                </div>
+                <div style={{ height: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${donePct}%`, background: 'linear-gradient(90deg, #6366F1, #10B981)', borderRadius: '3px', transition: 'width 0.3s' }} />
+                </div>
               </div>
-              <p style={{ fontSize: '16px', fontWeight: '600', color: '#10B981' }}>Workout complete!</p>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>Great work today, Logan.</p>
-            </div>
+
+              <SortableExerciseList
+                exercises={prog.exercises}
+                progId={selected}
+                todayLogs={todayLogs}
+                lastWeekLogs={lastWeekLogs}
+                onEdit={openEditEx}
+                onAddVariant={openAddVariant}
+                allCharts={allCharts}
+                setAllCharts={setAllCharts}
+                onLogChange={handleLogChange}
+                chartData={chartData}
+                onReorder={handleReorder}
+              />
+
+              <button onClick={openAddEx} style={{ padding: '14px', borderRadius: '18px', cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.4)', fontSize: '14px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <PlusIcon /> Add exercise
+              </button>
+
+              {donePct === 100 && (
+                <div style={{ ...glass, padding: '20px', textAlign: 'center', background: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)' }}>
+                  <div style={{ ...iconBg, margin: '0 auto 12px', background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                    <CheckIcon />
+                  </div>
+                  <p style={{ fontSize: '16px', fontWeight: '600', color: '#10B981' }}>Workout complete!</p>
+                  <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>Great work today, Logan.</p>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
@@ -549,7 +788,7 @@ export default function Workout() {
       )}
 
       {showExModal && (
-        <Modal title={modalTitle} onClose={() => setShowExModal(false)}>
+        <Modal title={editingEx ? (editingEx.parent_id ? 'Edit similar exercise' : 'Edit exercise') : addingVariantFor ? 'Add similar exercise' : 'Add exercise'} onClose={() => setShowExModal(false)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div><label style={labelStyle}>Exercise name</label><input style={inputStyle} placeholder="e.g. Bench Press" value={exForm.name} onChange={e => setExForm(f => ({ ...f, name: e.target.value }))} /></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
@@ -559,13 +798,8 @@ export default function Workout() {
             </div>
             <div>
               <label style={labelStyle}>Notes</label>
-              <textarea
-                placeholder="e.g. Drop set on last set, reduce by 20%. Rest 3 min between sets."
-                value={exForm.notes}
-                onChange={e => setExForm(f => ({ ...f, notes: e.target.value }))}
-                rows={3}
-                style={{ ...inputStyle, resize: 'none', lineHeight: '1.6', padding: '12px', fontSize: '14px' }}
-              />
+              <textarea placeholder="e.g. Drop set on last set, reduce by 20%." value={exForm.notes} onChange={e => setExForm(f => ({ ...f, notes: e.target.value }))} rows={3}
+                style={{ ...inputStyle, resize: 'none', lineHeight: '1.6', padding: '12px', fontSize: '14px' }} />
             </div>
             <button onClick={saveEx} style={{ ...btnPrimary, marginTop: '4px' }}>{editingEx ? 'Save changes' : 'Add exercise'}</button>
             {editingEx && <button onClick={deleteEx} style={{ ...btnSecondary, color: 'rgba(255,100,100,0.8)', border: '1px solid rgba(255,100,100,0.2)' }}>Delete exercise</button>}
