@@ -244,14 +244,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
         <div style={{ padding: '0 16px 14px', paddingLeft: isVariant ? '32px' : '16px' }}>
 
           {/* Targets */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-            {[{ label: 'Sets', value: ex.sets }, { label: 'Reps', value: ex.reps }, { label: 'Target', value: ex.weight > 0 ? `${ex.weight} lbs` : '—' }].map(s => (
-              <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '8px 10px' }}>
-                <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', marginBottom: '3px' }}>{s.label}</p>
-                <p style={{ fontSize: '13px', fontWeight: '600', color: 'rgba(255,255,255,0.8)' }}>{s.value}</p>
-              </div>
-            ))}
-          </div>
+          
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
   {[{ label: 'Sets', value: ex.sets }, { label: 'Reps', value: ex.reps }, { label: 'Target', value: ex.weight > 0 ? `${ex.weight} lbs` : '—' }].map(s => (
     <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '8px 10px' }}>
