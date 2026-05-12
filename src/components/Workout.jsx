@@ -90,9 +90,8 @@ function WorkoutTimer({ isActive }) {
   const intervalRef = useRef(null)
 
   useEffect(() => {
-    if (isActive && !running) { setElapsed(0); setRunning(true) }
-    if (!isActive) { clearInterval(intervalRef.current); setRunning(false); setElapsed(0) }
-  }, [isActive])
+  if (!isActive) { clearInterval(intervalRef.current); setRunning(false); setElapsed(0) }
+}, [isActive])
 
   useEffect(() => {
     if (running) {
