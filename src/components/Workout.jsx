@@ -56,7 +56,219 @@ const DragIcon = () => (
   </svg>
 )
 
-// ── Progress chart (shared) ──────────────────────────────────────────────────
+const fmtTime = (s) => {
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+}
+
+// Beep sound using Web Audio API
+const playBeep = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain); gain.connect(ctx.destination)
+    osc.frequency.value = 880
+    osc.type = 'sine'
+    gain.gain.setValueAtTime(0.5, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6)
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.6)
+  } catch (e) {}
+}
+
+const vibrate = (pattern = [200, 100, 200]) => {
+  try { if (navigator.vibrate) navigator.vibrate(pattern) } catch (e) {}
+}
+
+// ── Workout timer ────────────────────────────────────────────────────────────
+function WorkoutTimer({ isActive }) {
+  const [elapsed, setElapsed] = useState(0)
+  const [running, setRunning] = useState(false)
+  const intervalRef = useRef(null)
+
+  useEffect(() => {
+    if (isActive && !running) { setElapsed(0); setRunning(true) }
+    if (!isActive) { clearInterval(intervalRef.current); setRunning(false); setElapsed(0) }
+  }, [isActive])
+
+  useEffect(() => {
+    if (running) {
+      intervalRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
+    } else {
+      clearInterval(intervalRef.current)
+    }
+    return () => clearInterval(intervalRef.current)
+  }, [running])
+
+  if (!isActive) return null
+
+  return (
+    <div style={{ ...glass, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: running ? '#10B981' : 'rgba(255,255,255,0.3)', boxShadow: running ? '0 0 8px #10B981' : 'none', animation: running ? 'pulse 1.5s infinite' : 'none' }} />
+        <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>Workout time</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <span style={{ fontSize: '22px', fontWeight: '700', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(elapsed)}</span>
+        <button onClick={() => setRunning(r => !r)} style={{ padding: '6px 14px', borderRadius: '10px', cursor: 'pointer', background: running ? 'rgba(255,255,255,0.1)' : 'rgba(99,102,241,0.4)', border: `1px solid ${running ? 'rgba(255,255,255,0.2)' : 'rgba(99,102,241,0.5)'}`, color: '#fff', fontSize: '12px', fontFamily: 'Inter, sans-serif', fontWeight: '500' }}>
+          {running ? 'Pause' : 'Resume'}
+        </button>
+      </div>
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
+    </div>
+  )
+}
+
+// ── Rest timer ───────────────────────────────────────────────────────────────
+function RestTimer({ restSeconds, onDismiss }) {
+  const [remaining, setRemaining] = useState(restSeconds)
+  const [editTime, setEditTime] = useState(false)
+  const [customSecs, setCustomSecs] = useState(restSeconds)
+  const intervalRef = useRef(null)
+  const hasAlerted = useRef(false)
+
+  useEffect(() => {
+    setRemaining(restSeconds)
+    setCustomSecs(restSeconds)
+    hasAlerted.current = false
+  }, [restSeconds])
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      setRemaining(r => {
+        if (r <= 1) {
+          clearInterval(intervalRef.current)
+          if (!hasAlerted.current) {
+            hasAlerted.current = true
+            playBeep()
+            vibrate([300, 100, 300, 100, 300])
+          }
+          return 0
+        }
+        return r - 1
+      })
+    }, 1000)
+    return () => clearInterval(intervalRef.current)
+  }, [])
+
+  const pct = Math.max(0, remaining / restSeconds)
+  const circumference = 2 * Math.PI * 28
+  const isDone = remaining === 0
+
+  const applyCustom = () => {
+    clearInterval(intervalRef.current)
+    const secs = parseInt(customSecs) || 60
+    setRemaining(secs)
+    hasAlerted.current = false
+    setEditTime(false)
+    intervalRef.current = setInterval(() => {
+      setRemaining(r => {
+        if (r <= 1) {
+          clearInterval(intervalRef.current)
+          if (!hasAlerted.current) {
+            hasAlerted.current = true
+            playBeep()
+            vibrate([300, 100, 300, 100, 300])
+          }
+          return 0
+        }
+        return r - 1
+      })
+    }, 1000)
+  }
+
+  const addTime = (s) => {
+    clearInterval(intervalRef.current)
+    const next = Math.max(0, remaining + s)
+    setRemaining(next)
+    if (next > 0) {
+      hasAlerted.current = false
+      intervalRef.current = setInterval(() => {
+        setRemaining(r => {
+          if (r <= 1) {
+            clearInterval(intervalRef.current)
+            if (!hasAlerted.current) {
+              hasAlerted.current = true
+              playBeep()
+              vibrate([300, 100, 300, 100, 300])
+            }
+            return 0
+          }
+          return r - 1
+        })
+      }, 1000)
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', bottom: '100px', left: '50%', transform: 'translateX(-50%)', width: 'calc(100% - 32px)', maxWidth: '414px', zIndex: 150, background: isDone ? 'rgba(16,185,129,0.95)' : 'rgba(18,27,46,0.97)', border: `1px solid ${isDone ? 'rgba(16,185,129,0.5)' : 'rgba(99,102,241,0.4)'}`, borderRadius: '24px', padding: '16px 20px', backdropFilter: 'blur(20px)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+
+      {isDone ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ fontSize: '16px', fontWeight: '700', color: '#fff' }}>Rest complete!</p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginTop: '2px' }}>Time for your next set</p>
+          </div>
+          <button onClick={onDismiss} style={{ padding: '10px 18px', borderRadius: '12px', cursor: 'pointer', background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', fontSize: '14px', fontWeight: '600', fontFamily: 'Inter, sans-serif' }}>Done</button>
+        </div>
+      ) : (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <p style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.8)' }}>Rest timer</p>
+            <button onClick={onDismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: '18px', padding: '0' }}>×</button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Ring */}
+            <div style={{ position: 'relative', width: '72px', height: '72px', flexShrink: 0 }}>
+              <svg width="72" height="72" viewBox="0 0 72 72">
+                <circle cx="36" cy="36" r="28" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="5"/>
+                <circle cx="36" cy="36" r="28" fill="none" stroke={remaining < 10 ? '#EF4444' : '#6366F1'} strokeWidth="5"
+                  strokeDasharray={`${circumference * pct} ${circumference}`}
+                  strokeLinecap="round" transform="rotate(-90 36 36)"
+                  style={{ transition: 'stroke-dasharray 0.9s linear, stroke 0.3s' }}
+                />
+              </svg>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: '15px', fontWeight: '700', color: remaining < 10 ? '#EF4444' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(remaining)}</span>
+              </div>
+            </div>
+
+            <div style={{ flex: 1 }}>
+              {/* Adjust buttons */}
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                {[-30, -15, +15, +30].map(s => (
+                  <button key={s} onClick={() => addTime(s)} style={{ flex: 1, padding: '7px 0', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: '12px', fontFamily: 'Inter, sans-serif', fontWeight: '500' }}>
+                    {s > 0 ? `+${s}s` : `${s}s`}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom time */}
+              {editTime ? (
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input type="number" value={customSecs} onChange={e => setCustomSecs(e.target.value)}
+                    style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '10px', padding: '8px 10px', color: '#fff', fontSize: '14px', fontFamily: 'Inter, sans-serif', outline: 'none' }} />
+                  <button onClick={applyCustom} style={{ padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(99,102,241,0.5)', border: 'none', color: '#fff', fontSize: '13px', fontFamily: 'Inter, sans-serif' }}>Set</button>
+                  <button onClick={() => setEditTime(false)} style={{ padding: '8px 10px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontFamily: 'Inter, sans-serif' }}>Cancel</button>
+                </div>
+              ) : (
+                <button onClick={() => setEditTime(true)} style={{ width: '100%', padding: '7px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontFamily: 'Inter, sans-serif' }}>
+                  Set custom time
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Progress chart ───────────────────────────────────────────────────────────
 function ProgressChart({ data, unit = 'lbs' }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
@@ -108,62 +320,47 @@ function ProgressChart({ data, unit = 'lbs' }) {
     const minV = Math.max(0, Math.min(...vals) * 0.97)
     const maxV = Math.max(...vals) * 1.03 || 100
 
-    ctx.font = '10px Inter, sans-serif'
-    ctx.textAlign = 'right'
+    ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'right'
     ;[0, 0.5, 1].forEach(pct => {
       const v = (minV + pct * (maxV - minV)).toFixed(1)
       const y = PAD.T + chartH - pct * chartH
-      ctx.fillStyle = 'rgba(255,255,255,0.35)'
-      ctx.fillText(v, PAD.L - 5, y + 4)
-      ctx.strokeStyle = 'rgba(255,255,255,0.06)'
-      ctx.lineWidth = 1; ctx.setLineDash([3, 3])
-      ctx.beginPath(); ctx.moveTo(PAD.L, y); ctx.lineTo(W - PAD.R, y); ctx.stroke()
-      ctx.setLineDash([])
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillText(v, PAD.L - 5, y + 4)
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3])
+      ctx.beginPath(); ctx.moveTo(PAD.L, y); ctx.lineTo(W - PAD.R, y); ctx.stroke(); ctx.setLineDash([])
     })
 
     const grad = ctx.createLinearGradient(0, PAD.T, 0, PAD.T + chartH)
-    grad.addColorStop(0, 'rgba(99,102,241,0.35)')
-    grad.addColorStop(1, 'rgba(99,102,241,0)')
-    ctx.beginPath()
-    ctx.moveTo(pts[0].x, PAD.T + chartH)
+    grad.addColorStop(0, 'rgba(99,102,241,0.35)'); grad.addColorStop(1, 'rgba(99,102,241,0)')
+    ctx.beginPath(); ctx.moveTo(pts[0].x, PAD.T + chartH)
     pts.forEach(p => ctx.lineTo(p.x, p.y))
-    ctx.lineTo(pts[pts.length - 1].x, PAD.T + chartH)
-    ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
+    ctx.lineTo(pts[pts.length - 1].x, PAD.T + chartH); ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
 
-    ctx.beginPath(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2
-    ctx.lineJoin = 'round'; ctx.lineCap = 'round'
-    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y))
-    ctx.stroke()
+    ctx.beginPath(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round'
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)); ctx.stroke()
 
     ctx.textAlign = 'center'; ctx.font = '10px Inter, sans-serif'
     pts.forEach(p => {
       ctx.fillStyle = p.idx === hiIdx ? '#fff' : 'rgba(255,255,255,0.4)'
       ctx.fillText(p.label, p.x, PAD.T + chartH + 18)
     })
-
     pts.forEach(p => {
       const hi = p.idx === hiIdx
       if (hi) { ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill() }
-      ctx.beginPath(); ctx.arc(p.x, p.y, hi ? 5 : 3, 0, Math.PI * 2)
-      ctx.fillStyle = hi ? '#fff' : 'rgba(255,255,255,0.6)'; ctx.fill()
+      ctx.beginPath(); ctx.arc(p.x, p.y, hi ? 5 : 3, 0, Math.PI * 2); ctx.fillStyle = hi ? '#fff' : 'rgba(255,255,255,0.6)'; ctx.fill()
     })
-
     if (hiIdx !== null && pts[hiIdx]) {
       const p = pts[hiIdx]
       ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3])
-      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, PAD.T + chartH); ctx.stroke()
-      ctx.setLineDash([])
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, PAD.T + chartH); ctx.stroke(); ctx.setLineDash([])
     }
   }
 
   useEffect(() => { setup(); draw() }, [data])
 
   const handleInteraction = (clientX) => {
-    const canvas = canvasRef.current
-    const container = containerRef.current
+    const canvas = canvasRef.current; const container = containerRef.current
     if (!canvas || !container) return
-    const dpr = dprRef.current
-    const rect = canvas.getBoundingClientRect()
+    const dpr = dprRef.current; const rect = canvas.getBoundingClientRect()
     const x = ((clientX - rect.left) / rect.width) * (canvas.width / dpr)
     const pts = getPoints(canvas.width / dpr, canvas.height / dpr)
     let closest = null, minDist = Infinity
@@ -171,8 +368,7 @@ function ProgressChart({ data, unit = 'lbs' }) {
     if (closest && minDist < 50) {
       draw(closest.idx)
       const pct = closest.x / (canvas.width / dpr)
-      const containerRect = container.getBoundingClientRect()
-      setTooltip({ x: (rect.left - containerRect.left) + pct * rect.width, value: closest.value, label: closest.label })
+      setTooltip({ x: (rect.left - container.getBoundingClientRect().left) + pct * rect.width, value: closest.value, label: closest.label })
     }
   }
 
@@ -217,18 +413,13 @@ function BodyWeightSection() {
   const save = async () => {
     if (!weight) return
     setSaving(true)
-    if (todayLog) {
-      await supabase.from('body_weight_logs').update({ weight_lbs: parseFloat(weight), notes }).eq('id', todayLog.id)
-    } else {
-      await supabase.from('body_weight_logs').insert({ logged_date: today, weight_lbs: parseFloat(weight), notes })
-    }
-    await loadLogs()
-    setSaving(false)
+    if (todayLog) await supabase.from('body_weight_logs').update({ weight_lbs: parseFloat(weight), notes }).eq('id', todayLog.id)
+    else await supabase.from('body_weight_logs').insert({ logged_date: today, weight_lbs: parseFloat(weight), notes })
+    await loadLogs(); setSaving(false)
   }
 
   const filtered = (() => {
-    const now = new Date()
-    const cutoff = new Date()
+    const now = new Date(); const cutoff = new Date()
     if (range === 'week') cutoff.setDate(now.getDate() - 7)
     else if (range === 'month') cutoff.setDate(now.getDate() - 30)
     else if (range === '3month') cutoff.setDate(now.getDate() - 90)
@@ -236,51 +427,36 @@ function BodyWeightSection() {
     return logs.filter(l => new Date(l.logged_date) >= cutoff)
   })()
 
-  const chartData = filtered.map(l => ({
-    label: new Date(l.logged_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    value: String(l.weight_lbs),
-  }))
-
+  const chartData = filtered.map(l => ({ label: new Date(l.logged_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: String(l.weight_lbs) }))
   const latest = logs[logs.length - 1]
   const prev = logs[logs.length - 2]
   const diff = latest && prev ? (parseFloat(latest.weight_lbs) - parseFloat(prev.weight_lbs)).toFixed(1) : null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
-      {/* Log today */}
       <div style={{ ...glass, padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Log Today's Weight</h3>
           {latest && (
             <div style={{ textAlign: 'right' }}>
               <p style={{ fontSize: '20px', fontWeight: '700' }}>{latest.weight_lbs} <span style={{ fontSize: '13px', fontWeight: '400', color: 'rgba(255,255,255,0.5)' }}>lbs</span></p>
-              {diff !== null && (
-                <p style={{ fontSize: '12px', color: parseFloat(diff) <= 0 ? '#10B981' : 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
-                  {parseFloat(diff) > 0 ? '+' : ''}{diff} lbs
-                </p>
-              )}
+              {diff !== null && <p style={{ fontSize: '12px', color: parseFloat(diff) <= 0 ? '#10B981' : 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{parseFloat(diff) > 0 ? '+' : ''}{diff} lbs</p>}
             </div>
           )}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px', marginBottom: '10px' }}>
           <div>
             <label style={labelStyle}>Weight (lbs)</label>
-            <input type="number" placeholder="185" value={weight} onChange={e => setWeight(e.target.value)}
-              style={{ ...inputStyle, fontSize: '16px' }} />
+            <input type="number" placeholder="185" value={weight} onChange={e => setWeight(e.target.value)} style={{ ...inputStyle, fontSize: '16px' }} />
           </div>
           <div>
             <label style={labelStyle}>Notes (optional)</label>
-            <input type="text" placeholder="e.g. morning, fasted" value={notes} onChange={e => setNotes(e.target.value)}
-              style={{ ...inputStyle, fontSize: '16px' }} />
+            <input type="text" placeholder="e.g. morning, fasted" value={notes} onChange={e => setNotes(e.target.value)} style={{ ...inputStyle, fontSize: '16px' }} />
           </div>
         </div>
-        <button onClick={save} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}>
-          {saving ? 'Saving...' : todayLog ? 'Update' : 'Log weight'}
-        </button>
+        <button onClick={save} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : todayLog ? 'Update' : 'Log weight'}</button>
       </div>
 
-      {/* Chart */}
       {logs.length >= 2 && (
         <div style={{ ...glass, padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -291,27 +467,15 @@ function BodyWeightSection() {
               ))}
             </div>
           </div>
-          {chartData.length >= 2
-            ? <ProgressChart data={chartData} unit="lbs" />
-            : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '20px 0' }}>Log more days to see your chart.</p>
-          }
-
-          {/* Stats row */}
+          {chartData.length >= 2 ? <ProgressChart data={chartData} unit="lbs" /> : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '20px 0' }}>Log more days to see your chart.</p>}
           {filtered.length >= 2 && (() => {
             const vals = filtered.map(l => parseFloat(l.weight_lbs))
             const start = vals[0], end = vals[vals.length - 1]
             const total = (end - start).toFixed(1)
             const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)
-            const low = Math.min(...vals).toFixed(1)
-            const high = Math.max(...vals).toFixed(1)
             return (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px', marginTop: '14px' }}>
-                {[
-                  { label: 'Change', value: `${parseFloat(total) > 0 ? '+' : ''}${total}`, color: parseFloat(total) <= 0 ? '#10B981' : 'rgba(255,255,255,0.8)' },
-                  { label: 'Average', value: avg },
-                  { label: 'Low', value: low },
-                  { label: 'High', value: high },
-                ].map(s => (
+                {[{ label: 'Change', value: `${parseFloat(total) > 0 ? '+' : ''}${total}`, color: parseFloat(total) <= 0 ? '#10B981' : 'rgba(255,255,255,0.8)' }, { label: 'Average', value: avg }, { label: 'Low', value: Math.min(...vals).toFixed(1) }, { label: 'High', value: Math.max(...vals).toFixed(1) }].map(s => (
                   <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
                     <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '3px' }}>{s.label}</p>
                     <p style={{ fontSize: '14px', fontWeight: '600', color: s.color || '#fff' }}>{s.value}</p>
@@ -323,7 +487,6 @@ function BodyWeightSection() {
         </div>
       )}
 
-      {/* Log history */}
       {logs.length > 0 && (
         <div style={{ ...glass, padding: '20px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>History</h3>
@@ -344,14 +507,20 @@ function BodyWeightSection() {
   )
 }
 
-// ── Draggable exercise row ───────────────────────────────────────────────────
-function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, dragHandleProps }) {
+// ── Exercise row ─────────────────────────────────────────────────────────────
+function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, dragHandleProps, onStartRest }) {
   const [expanded, setExpanded] = useState(false)
   const [variantsOpen, setVariantsOpen] = useState(false)
 
   const exLog = todayLogs[ex.id] || {}
   const lwLog = lastWeekLogs[ex.id] || {}
-  const toggleDone = () => onLogChange(ex.id, 'done', !exLog.done)
+
+  const toggleDone = () => {
+    const newDone = !exLog.done
+    onLogChange(ex.id, 'done', newDone)
+    if (newDone && !isVariant) onStartRest(ex.rest_seconds || 90)
+  }
+
   const chartKey = `${ex.id}`
   const isChartOpen = allCharts === chartKey
 
@@ -359,9 +528,8 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
     <div style={{ borderRadius: isVariant ? '14px' : '18px', background: exLog.done ? 'rgba(16,185,129,0.08)' : isVariant ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)', border: `1px solid ${exLog.done ? 'rgba(16,185,129,0.25)' : isVariant ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.15)'}`, overflow: 'hidden', transition: 'background 0.2s, border 0.2s' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: isVariant ? '11px 14px' : '14px 16px' }}>
-        {/* Drag handle — top level only */}
         {!isVariant && (
-          <div {...dragHandleProps} style={{ cursor: 'grab', padding: '4px 2px', color: 'rgba(255,255,255,0.2)', touchAction: 'none' }}>
+          <div {...dragHandleProps} style={{ cursor: 'grab', padding: '4px 2px', touchAction: 'none' }}>
             <DragIcon />
           </div>
         )}
@@ -396,7 +564,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
       {expanded && (
         <div style={{ padding: '0 16px 14px', paddingLeft: isVariant ? '32px' : '16px' }}>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-            {[{ label: 'Sets', value: ex.sets }, { label: 'Reps', value: ex.reps }, { label: 'Target', value: ex.weight > 0 ? `${ex.weight} lbs` : '—' }].map(s => (
+            {[{ label: 'Sets', value: ex.sets }, { label: 'Reps', value: ex.reps }, { label: 'Target', value: ex.weight > 0 ? `${ex.weight} lbs` : '—' }, { label: 'Rest', value: `${ex.rest_seconds || 90}s` }].map(s => (
               <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '8px 10px' }}>
                 <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', marginBottom: '3px' }}>{s.label}</p>
                 <p style={{ fontSize: '13px', fontWeight: '600', color: 'rgba(255,255,255,0.8)' }}>{s.value}</p>
@@ -437,6 +605,12 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             </div>
           </div>
 
+          {/* Manual rest timer trigger */}
+          <button onClick={() => onStartRest(ex.rest_seconds || 90)} style={{ width: '100%', padding: '8px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'rgba(199,200,255,0.8)', fontSize: '12px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Start rest timer ({ex.rest_seconds || 90}s)
+          </button>
+
           <button onClick={() => setAllCharts(isChartOpen ? null : chartKey)} style={{ width: '100%', padding: '8px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             {isChartOpen ? 'Hide progress' : 'View progress'}
@@ -445,10 +619,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
           {isChartOpen && (
             <div style={{ marginTop: '10px', padding: '14px', background: 'rgba(255,255,255,0.04)', borderRadius: '12px' }}>
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px' }}>Weight over time (lbs)</p>
-              {chartData && chartData.length >= 2
-                ? <ProgressChart data={chartData} unit="lbs" />
-                : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>Log 2+ sessions to see your chart.</p>
-              }
+              {chartData && chartData.length >= 2 ? <ProgressChart data={chartData} unit="lbs" /> : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>Log 2+ sessions to see your chart.</p>}
             </div>
           )}
         </div>
@@ -466,7 +637,8 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
               todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
               onEdit={onEdit} onAddVariant={onAddVariant}
               allCharts={allCharts} setAllCharts={setAllCharts}
-              onLogChange={onLogChange} chartData={chartData} />
+              onLogChange={onLogChange} chartData={chartData}
+              onStartRest={onStartRest} />
           ))}
         </div>
       )}
@@ -474,8 +646,8 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
   )
 }
 
-// ── Drag-sortable exercise list ──────────────────────────────────────────────
-function SortableExerciseList({ exercises, progId, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, onReorder }) {
+// ── Sortable list ────────────────────────────────────────────────────────────
+function SortableExerciseList({ exercises, progId, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, onReorder, onStartRest }) {
   const [items, setItems] = useState(exercises)
   const dragIdx = useRef(null)
   const dragOverIdx = useRef(null)
@@ -484,76 +656,29 @@ function SortableExerciseList({ exercises, progId, todayLogs, lastWeekLogs, onEd
 
   const handleDragStart = (i) => { dragIdx.current = i }
   const handleDragEnter = (i) => { dragOverIdx.current = i }
-
   const handleDragEnd = async () => {
-    const from = dragIdx.current
-    const to = dragOverIdx.current
+    const from = dragIdx.current; const to = dragOverIdx.current
     if (from === null || to === null || from === to) { dragIdx.current = null; dragOverIdx.current = null; return }
-    const next = [...items]
-    const [moved] = next.splice(from, 1)
-    next.splice(to, 0, moved)
-    setItems(next)
-    dragIdx.current = null; dragOverIdx.current = null
-    onReorder(next)
-    // Save new order to Supabase
+    const next = [...items]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved)
+    setItems(next); dragIdx.current = null; dragOverIdx.current = null; onReorder(next)
     await Promise.all(next.map((ex, idx) => supabase.from('exercises').update({ sort_order: idx }).eq('id', ex.id)))
   }
-
-  // Touch drag
-  const touchStartY = useRef(null)
-  const touchDragIdx = useRef(null)
-  const itemHeight = useRef(72)
-
-  const handleTouchStart = (e, i) => {
-    touchStartY.current = e.touches[0].clientY
-    touchDragIdx.current = i
-    dragIdx.current = i
-  }
-
-  const handleTouchMove = (e) => {
-    if (touchDragIdx.current === null) return
-    const y = e.touches[0].clientY
-    const diff = y - touchStartY.current
-    const newIdx = Math.max(0, Math.min(items.length - 1, touchDragIdx.current + Math.round(diff / itemHeight.current)))
-    dragOverIdx.current = newIdx
-  }
-
-  const handleTouchEnd = () => { handleDragEnd() }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {items.map((ex, i) => (
-        <div key={ex.id}
-          draggable
-          onDragStart={() => handleDragStart(i)}
-          onDragEnter={() => handleDragEnter(i)}
-          onDragEnd={handleDragEnd}
-          onDragOver={e => e.preventDefault()}
-          style={{ transition: 'transform 0.15s' }}
-        >
-          <ExerciseRow
-            ex={ex}
-            todayLogs={todayLogs}
-            lastWeekLogs={lastWeekLogs}
-            onEdit={onEdit}
-            onAddVariant={onAddVariant}
-            allCharts={allCharts}
-            setAllCharts={setAllCharts}
-            onLogChange={onLogChange}
-            chartData={chartData[ex.id]}
-            dragHandleProps={{
-              onTouchStart: e => handleTouchStart(e, i),
-              onTouchMove: handleTouchMove,
-              onTouchEnd: handleTouchEnd,
-            }}
-          />
+        <div key={ex.id} draggable onDragStart={() => handleDragStart(i)} onDragEnter={() => handleDragEnter(i)} onDragEnd={handleDragEnd} onDragOver={e => e.preventDefault()}>
+          <ExerciseRow ex={ex} todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
+            onEdit={onEdit} onAddVariant={onAddVariant} allCharts={allCharts} setAllCharts={setAllCharts}
+            onLogChange={onLogChange} chartData={chartData[ex.id]} onStartRest={onStartRest}
+            dragHandleProps={{ style: { cursor: 'grab', padding: '4px 2px', touchAction: 'none' } }} />
         </div>
       ))}
     </div>
   )
 }
 
-// ── Main Workout component ───────────────────────────────────────────────────
+// ── Main ─────────────────────────────────────────────────────────────────────
 export default function Workout() {
   const [programs, setPrograms] = useState([])
   const [todayLogs, setTodayLogs] = useState({})
@@ -562,14 +687,15 @@ export default function Workout() {
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
   const [allCharts, setAllCharts] = useState(null)
-  const [activeTab, setActiveTab] = useState('workout') // 'workout' | 'weight'
+  const [activeTab, setActiveTab] = useState('workout')
+  const [restTimer, setRestTimer] = useState(null) // { secs, key }
   const [showAddProg, setShowAddProg] = useState(false)
   const [showExModal, setShowExModal] = useState(false)
   const [editingProg, setEditingProg] = useState(null)
   const [editingEx, setEditingEx] = useState(null)
   const [addingVariantFor, setAddingVariantFor] = useState(null)
   const [progForm, setProgForm] = useState({ name: '', tag: 'Strength' })
-  const [exForm, setExForm] = useState({ name: '', sets: '', reps: '', weight: '', notes: '' })
+  const [exForm, setExForm] = useState({ name: '', sets: '', reps: '', weight: '', notes: '', rest_seconds: '90' })
 
   const today = new Date().toISOString().split('T')[0]
   const lastWeek = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
@@ -585,16 +711,11 @@ export default function Workout() {
       const { data: lwLogs } = await supabase.from('workout_logs').select('*').eq('logged_date', lastWeek)
       const { data: allLogs } = await supabase.from('workout_logs').select('*').order('logged_date')
 
-      const exerciseMap = {}
-      const topLevel = []
+      const exerciseMap = {}; const topLevel = []
       exs?.forEach(e => { exerciseMap[e.id] = { ...e, variants: [] } })
-      exs?.forEach(e => {
-        if (e.parent_id) { if (exerciseMap[e.parent_id]) exerciseMap[e.parent_id].variants.push(exerciseMap[e.id]) }
-        else topLevel.push(exerciseMap[e.id])
-      })
+      exs?.forEach(e => { if (e.parent_id) { if (exerciseMap[e.parent_id]) exerciseMap[e.parent_id].variants.push(exerciseMap[e.id]) } else topLevel.push(exerciseMap[e.id]) })
 
       setPrograms(progs?.map(p => ({ ...p, exercises: topLevel.filter(e => e.program_id === p.id) })) || [])
-
       const tMap = {}; tLogs?.forEach(l => { tMap[l.exercise_id] = l }); setTodayLogs(tMap)
       const lwMap = {}; lwLogs?.forEach(l => { lwMap[l.exercise_id] = l }); setLastWeekLogs(lwMap)
 
@@ -602,10 +723,7 @@ export default function Workout() {
       allLogs?.forEach(l => {
         if (!l.weight_used || parseFloat(l.weight_used) <= 0) return
         if (!cMap[l.exercise_id]) cMap[l.exercise_id] = []
-        cMap[l.exercise_id].push({
-          label: new Date(l.logged_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          value: l.weight_used,
-        })
+        cMap[l.exercise_id].push({ label: new Date(l.logged_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: l.weight_used })
       })
       setChartData(cMap)
     } catch (e) { console.error(e) }
@@ -613,7 +731,6 @@ export default function Workout() {
   }
 
   const prog = programs.find(p => p.id === selected)
-
   const donePct = (() => {
     if (!prog) return 0
     const allExIds = prog.exercises.flatMap(e => [e.id, ...(e.variants || []).map(v => v.id)])
@@ -631,6 +748,8 @@ export default function Workout() {
     }
   }
 
+  const startRest = (secs) => setRestTimer({ secs, key: Date.now() })
+
   const openAddProg = () => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setShowAddProg(true) }
   const openEditProg = (e, p) => { e.stopPropagation(); setEditingProg(p); setProgForm({ name: p.name, tag: p.tag }); setShowAddProg(true) }
   const saveProg = async () => {
@@ -639,31 +758,25 @@ export default function Workout() {
     else await supabase.from('programs').insert(progForm)
     setShowAddProg(false); loadAll()
   }
-  const deleteProg = async () => {
-    await supabase.from('programs').delete().eq('id', editingProg.id)
-    setSelected(null); setShowAddProg(false); loadAll()
-  }
+  const deleteProg = async () => { await supabase.from('programs').delete().eq('id', editingProg.id); setSelected(null); setShowAddProg(false); loadAll() }
 
-  const openAddEx = () => { setEditingEx(null); setAddingVariantFor(null); setExForm({ name: '', sets: '', reps: '', weight: '', notes: '' }); setShowExModal(true) }
+  const openAddEx = () => { setEditingEx(null); setAddingVariantFor(null); setExForm({ name: '', sets: '', reps: '', weight: '', notes: '', rest_seconds: '90' }); setShowExModal(true) }
   const openEditEx = (e, ex) => {
     e.stopPropagation(); setEditingEx(ex); setAddingVariantFor(null)
-    setExForm({ name: ex.name, sets: String(ex.sets), reps: ex.reps, weight: String(ex.weight), notes: ex.notes || '' })
+    setExForm({ name: ex.name, sets: String(ex.sets), reps: ex.reps, weight: String(ex.weight), notes: ex.notes || '', rest_seconds: String(ex.rest_seconds || 90) })
     setShowExModal(true)
   }
-  const openAddVariant = (parentExId) => { setEditingEx(null); setAddingVariantFor(parentExId); setExForm({ name: '', sets: '', reps: '', weight: '', notes: '' }); setShowExModal(true) }
+  const openAddVariant = (parentExId) => { setEditingEx(null); setAddingVariantFor(parentExId); setExForm({ name: '', sets: '', reps: '', weight: '', notes: '', rest_seconds: '90' }); setShowExModal(true) }
   const saveEx = async () => {
     if (!exForm.name.trim()) return
-    const built = { name: exForm.name, sets: parseInt(exForm.sets) || 1, reps: exForm.reps, weight: exForm.weight, notes: exForm.notes }
+    const built = { name: exForm.name, sets: parseInt(exForm.sets) || 1, reps: exForm.reps, weight: exForm.weight, notes: exForm.notes, rest_seconds: parseInt(exForm.rest_seconds) || 90 }
     if (editingEx) await supabase.from('exercises').update(built).eq('id', editingEx.id)
     else if (addingVariantFor) await supabase.from('exercises').insert({ ...built, program_id: selected, parent_id: addingVariantFor })
     else await supabase.from('exercises').insert({ ...built, program_id: selected })
     setShowExModal(false); loadAll()
   }
   const deleteEx = async () => { await supabase.from('exercises').delete().eq('id', editingEx.id); setShowExModal(false); loadAll() }
-
-  const handleReorder = (newOrder) => {
-    setPrograms(ps => ps.map(p => p.id === selected ? { ...p, exercises: newOrder } : p))
-  }
+  const handleReorder = (newOrder) => setPrograms(ps => ps.map(p => p.id === selected ? { ...p, exercises: newOrder } : p))
 
   if (loading) return (
     <div style={{ padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px' }}>
@@ -676,7 +789,6 @@ export default function Workout() {
   return (
     <div style={{ padding: '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: '700' }}>Workout</h1>
@@ -693,21 +805,15 @@ export default function Workout() {
 
       {/* Tab switcher */}
       <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '16px', padding: '4px' }}>
-        {[
-          { id: 'workout', label: 'Training', icon: <DumbbellIcon /> },
-          { id: 'weight', label: 'Body Weight', icon: <ScaleIcon /> },
-        ].map(t => (
+        {[{ id: 'workout', label: 'Training', icon: <DumbbellIcon /> }, { id: 'weight', label: 'Body Weight', icon: <ScaleIcon /> }].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', borderRadius: '12px', cursor: 'pointer', background: activeTab === t.id ? 'rgba(99,102,241,0.4)' : 'transparent', border: `1px solid ${activeTab === t.id ? 'rgba(99,102,241,0.5)' : 'transparent'}`, color: activeTab === t.id ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '500', fontFamily: 'Inter, sans-serif', transition: 'all 0.2s' }}>
-            {t.icon}
-            {t.label}
+            {t.icon}{t.label}
           </button>
         ))}
       </div>
 
-      {/* Body weight tab */}
       {activeTab === 'weight' && <BodyWeightSection />}
 
-      {/* Training tab */}
       {activeTab === 'workout' && (
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -727,6 +833,8 @@ export default function Workout() {
 
           {selected && prog && (
             <>
+              <WorkoutTimer isActive={!!selected} />
+
               <div style={{ ...glass, padding: '18px 20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                   <span style={{ fontSize: '14px', fontWeight: '600' }}>{prog.name}</span>
@@ -738,17 +846,12 @@ export default function Workout() {
               </div>
 
               <SortableExerciseList
-                exercises={prog.exercises}
-                progId={selected}
-                todayLogs={todayLogs}
-                lastWeekLogs={lastWeekLogs}
-                onEdit={openEditEx}
-                onAddVariant={openAddVariant}
-                allCharts={allCharts}
-                setAllCharts={setAllCharts}
-                onLogChange={handleLogChange}
-                chartData={chartData}
-                onReorder={handleReorder}
+                exercises={prog.exercises} progId={selected}
+                todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
+                onEdit={openEditEx} onAddVariant={openAddVariant}
+                allCharts={allCharts} setAllCharts={setAllCharts}
+                onLogChange={handleLogChange} chartData={chartData}
+                onReorder={handleReorder} onStartRest={startRest}
               />
 
               <button onClick={openAddEx} style={{ padding: '14px', borderRadius: '18px', cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.4)', fontSize: '14px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -757,9 +860,7 @@ export default function Workout() {
 
               {donePct === 100 && (
                 <div style={{ ...glass, padding: '20px', textAlign: 'center', background: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)' }}>
-                  <div style={{ ...iconBg, margin: '0 auto 12px', background: 'linear-gradient(135deg, #10B981, #059669)' }}>
-                    <CheckIcon />
-                  </div>
+                  <div style={{ ...iconBg, margin: '0 auto 12px', background: 'linear-gradient(135deg, #10B981, #059669)' }}><CheckIcon /></div>
                   <p style={{ fontSize: '16px', fontWeight: '600', color: '#10B981' }}>Workout complete!</p>
                   <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>Great work today, Logan.</p>
                 </div>
@@ -768,6 +869,9 @@ export default function Workout() {
           )}
         </>
       )}
+
+      {/* Rest timer overlay */}
+      {restTimer && <RestTimer key={restTimer.key} restSeconds={restTimer.secs} onDismiss={() => setRestTimer(null)} />}
 
       {showAddProg && (
         <Modal title={editingProg ? 'Edit program' : 'New program'} onClose={() => setShowAddProg(false)}>
@@ -795,6 +899,15 @@ export default function Workout() {
               <div><label style={labelStyle}>Sets</label><input style={inputStyle} type="number" placeholder="4" value={exForm.sets} onChange={e => setExForm(f => ({ ...f, sets: e.target.value }))} /></div>
               <div><label style={labelStyle}>Reps</label><input style={inputStyle} placeholder="8–10" value={exForm.reps} onChange={e => setExForm(f => ({ ...f, reps: e.target.value }))} /></div>
               <div><label style={labelStyle}>Weight (lbs)</label><input style={inputStyle} type="number" placeholder="135" value={exForm.weight} onChange={e => setExForm(f => ({ ...f, weight: e.target.value }))} /></div>
+            </div>
+            <div>
+              <label style={labelStyle}>Rest time (seconds)</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {[60, 90, 120, 180].map(s => (
+                  <button key={s} onClick={() => setExForm(f => ({ ...f, rest_seconds: String(s) }))} style={{ flex: 1, padding: '8px', borderRadius: '12px', cursor: 'pointer', background: exForm.rest_seconds === String(s) ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)', border: `1px solid ${exForm.rest_seconds === String(s) ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.15)'}`, color: exForm.rest_seconds === String(s) ? '#fff' : 'rgba(255,255,255,0.6)', fontSize: '12px', fontFamily: 'Inter, sans-serif' }}>{s}s</button>
+                ))}
+              </div>
+              <input style={{ ...inputStyle, marginTop: '8px', fontSize: '16px' }} type="number" placeholder="Custom seconds" value={exForm.rest_seconds} onChange={e => setExForm(f => ({ ...f, rest_seconds: e.target.value }))} />
             </div>
             <div>
               <label style={labelStyle}>Notes</label>
