@@ -16,13 +16,13 @@ const HeartIcon = () => (
     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
   </svg>
 )
-const ChevronDown = ({ color = 'rgba(255,255,255,0.4)' }) => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const ChevronDown = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="6 9 12 15 18 9"/>
   </svg>
 )
-const ChevronUp = ({ color = 'rgba(255,255,255,0.4)' }) => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const ChevronUp = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="18 15 12 9 6 15"/>
   </svg>
 )
@@ -221,7 +221,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
         </div>
       </div>
 
-      {/* Expanded */}
+      {/* Expanded detail */}
       {expanded && (
         <div style={{ padding: '0 16px 14px', paddingLeft: isVariant ? '32px' : '16px' }}>
 
@@ -329,24 +329,17 @@ export default function Workout() {
   const today = new Date().toISOString().split('T')[0]
   const lastWeek = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
 
-  // Load everything from Supabase
   useEffect(() => { loadAll() }, [])
 
   const loadAll = async () => {
     setLoading(true)
     try {
-      // Load programs
       const { data: progs } = await supabase.from('programs').select('*').order('id')
-      // Load exercises
       const { data: exs } = await supabase.from('exercises').select('*').order('sort_order')
-      // Load today's logs
       const { data: tLogs } = await supabase.from('workout_logs').select('*').eq('logged_date', today)
-      // Load last week's logs
       const { data: lwLogs } = await supabase.from('workout_logs').select('*').eq('logged_date', lastWeek)
-      // Load all logs for charts
       const { data: allLogs } = await supabase.from('workout_logs').select('*').order('logged_date')
 
-      // Build programs with nested exercises
       const exerciseMap = {}
       const topLevel = []
       exs?.forEach(e => { exerciseMap[e.id] = { ...e, variants: [] } })
@@ -365,17 +358,14 @@ export default function Workout() {
 
       setPrograms(builtProgs)
 
-      // Build today log map { exId: log }
       const tMap = {}
       tLogs?.forEach(l => { tMap[l.exercise_id] = l })
       setTodayLogs(tMap)
 
-      // Build last week log map
       const lwMap = {}
       lwLogs?.forEach(l => { lwMap[l.exercise_id] = l })
       setLastWeekLogs(lwMap)
 
-      // Build chart data per exercise
       const cMap = {}
       allLogs?.forEach(l => {
         if (!l.weight_used || parseFloat(l.weight_used) <= 0) return
@@ -400,14 +390,11 @@ export default function Workout() {
     return Math.round(doneCount / Math.max(allExIds.length, 1) * 100)
   })()
 
-  // Log a field for an exercise — upsert to Supabase
   const handleLogChange = async (exId, field, value) => {
-    // Optimistic update
     setTodayLogs(prev => ({
       ...prev,
       [exId]: { ...(prev[exId] || {}), [field]: value, exercise_id: exId }
     }))
-
     const existing = todayLogs[exId]
     if (existing?.id) {
       await supabase.from('workout_logs').update({ [field]: value }).eq('id', existing.id)
@@ -419,50 +406,40 @@ export default function Workout() {
     }
   }
 
-  // Program CRUD
   const openAddProg = () => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setShowAddProg(true) }
   const openEditProg = (e, p) => { e.stopPropagation(); setEditingProg(p); setProgForm({ name: p.name, tag: p.tag }); setShowAddProg(true) }
 
   const saveProg = async () => {
     if (!progForm.name.trim()) return
-    if (editingProg) {
-      await supabase.from('programs').update(progForm).eq('id', editingProg.id)
-    } else {
-      await supabase.from('programs').insert(progForm)
-    }
+    if (editingProg) { await supabase.from('programs').update(progForm).eq('id', editingProg.id) }
+    else { await supabase.from('programs').insert(progForm) }
     setShowAddProg(false)
     loadAll()
   }
 
   const deleteProg = async () => {
     await supabase.from('programs').delete().eq('id', editingProg.id)
-    setSelected(null)
-    setShowAddProg(false)
-    loadAll()
+    setSelected(null); setShowAddProg(false); loadAll()
   }
 
-  // Exercise CRUD
-  const openAddEx = () => { setEditingEx(null); setAddingVariantFor(null); setExForm({ name: '', sets: '', reps: '', weight: '' }); setShowExModal(true) }
+  const openAddEx = () => { setEditingEx(null); setAddingVariantFor(null); setExForm({ name: '', sets: '', reps: '', weight: '', notes: '' }); setShowExModal(true) }
 
   const openEditEx = (e, ex) => {
     e.stopPropagation()
-    setEditingEx(ex)
-    setAddingVariantFor(null)
+    setEditingEx(ex); setAddingVariantFor(null)
     setExForm({ name: ex.name, sets: String(ex.sets), reps: ex.reps, weight: String(ex.weight), notes: ex.notes || '' })
     setShowExModal(true)
   }
 
   const openAddVariant = (parentExId) => {
-    setEditingEx(null)
-    setAddingVariantFor(parentExId)
-    setExForm({ name: '', sets: '', reps: '', weight: '' })
+    setEditingEx(null); setAddingVariantFor(parentExId)
+    setExForm({ name: '', sets: '', reps: '', weight: '', notes: '' })
     setShowExModal(true)
   }
 
   const saveEx = async () => {
     if (!exForm.name.trim()) return
     const built = { name: exForm.name, sets: parseInt(exForm.sets) || 1, reps: exForm.reps, weight: exForm.weight, notes: exForm.notes }
-
     if (editingEx) {
       await supabase.from('exercises').update(built).eq('id', editingEx.id)
     } else if (addingVariantFor) {
@@ -470,14 +447,12 @@ export default function Workout() {
     } else {
       await supabase.from('exercises').insert({ ...built, program_id: selected })
     }
-    setShowExModal(false)
-    loadAll()
+    setShowExModal(false); loadAll()
   }
 
   const deleteEx = async () => {
     await supabase.from('exercises').delete().eq('id', editingEx.id)
-    setShowExModal(false)
-    loadAll()
+    setShowExModal(false); loadAll()
   }
 
   const modalTitle = editingEx ? (editingEx.parent_id ? 'Edit similar exercise' : 'Edit exercise') : addingVariantFor ? 'Add similar exercise' : 'Add exercise'
@@ -532,7 +507,8 @@ export default function Workout() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {prog.exercises.map(ex => (
-              <ExerciseRow key={ex.id} ex={ex} todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
+              <ExerciseRow key={ex.id} ex={ex}
+                todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
                 onEdit={openEditEx} onAddVariant={openAddVariant}
                 allCharts={allCharts} setAllCharts={setAllCharts}
                 onLogChange={handleLogChange} chartData={chartData[ex.id]} />
@@ -581,25 +557,16 @@ export default function Workout() {
               <div><label style={labelStyle}>Reps</label><input style={inputStyle} placeholder="8–10" value={exForm.reps} onChange={e => setExForm(f => ({ ...f, reps: e.target.value }))} /></div>
               <div><label style={labelStyle}>Weight (lbs)</label><input style={inputStyle} type="number" placeholder="135" value={exForm.weight} onChange={e => setExForm(f => ({ ...f, weight: e.target.value }))} /></div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-  <div><label style={labelStyle}>Sets</label><input style={inputStyle} type="number" placeholder="4" value={exForm.sets} onChange={e => setExForm(f => ({ ...f, sets: e.target.value }))} /></div>
-  <div><label style={labelStyle}>Reps</label><input style={inputStyle} placeholder="8–10" value={exForm.reps} onChange={e => setExForm(f => ({ ...f, reps: e.target.value }))} /></div>
-  <div><label style={labelStyle}>Weight (lbs)</label><input style={inputStyle} type="number" placeholder="135" value={exForm.weight} onChange={e => setExForm(f => ({ ...f, weight: e.target.value }))} /></div>
-</div>
-
-{/* ADD THIS RIGHT HERE */}
-<div>
-  <label style={labelStyle}>Notes</label>
-  <textarea
-    placeholder="e.g. Drop set on last set, reduce by 20%. Rest 3 min between sets."
-    value={exForm.notes}
-    onChange={e => setExForm(f => ({ ...f, notes: e.target.value }))}
-    rows={3}
-    style={{ ...inputStyle, resize: 'none', lineHeight: '1.6', padding: '12px', fontSize: '14px' }}
-  />
-</div>
-
-<button onClick={saveEx} style={{ ...btnPrimary, marginTop: '4px' }}>{editingEx ? 'Save changes' : 'Add exercise'}</button>
+            <div>
+              <label style={labelStyle}>Notes</label>
+              <textarea
+                placeholder="e.g. Drop set on last set, reduce by 20%. Rest 3 min between sets."
+                value={exForm.notes}
+                onChange={e => setExForm(f => ({ ...f, notes: e.target.value }))}
+                rows={3}
+                style={{ ...inputStyle, resize: 'none', lineHeight: '1.6', padding: '12px', fontSize: '14px' }}
+              />
+            </div>
             <button onClick={saveEx} style={{ ...btnPrimary, marginTop: '4px' }}>{editingEx ? 'Save changes' : 'Add exercise'}</button>
             {editingEx && <button onClick={deleteEx} style={{ ...btnSecondary, color: 'rgba(255,100,100,0.8)', border: '1px solid rgba(255,100,100,0.2)' }}>Delete exercise</button>}
           </div>
