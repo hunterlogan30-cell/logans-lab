@@ -64,7 +64,7 @@ export default function Recovery() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    fetch('/api/whoop/data')
+   fetch(`/api/whoop/data?t=${Date.now()}`)
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
