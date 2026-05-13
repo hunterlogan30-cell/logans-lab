@@ -76,7 +76,12 @@ const playBeep = () => {
     osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.6)
   } catch(e) {}
 }
-
+const getRecommendedRest = (baseSeconds, recovery) => {
+  if (!recovery) return baseSeconds
+  if (recovery >= 67) return Math.round(baseSeconds * 0.85) // Green — shorter rest
+  if (recovery >= 34) return baseSeconds                     // Yellow — normal rest
+  return Math.round(baseSeconds * 1.3)                      // Red — longer rest
+}
 const vibrate = (pattern = [200,100,200]) => {
   try { if (navigator.vibrate) navigator.vibrate(pattern) } catch(e) {}
 }
@@ -694,8 +699,7 @@ function SortableExerciseList({ exercises, todayLogs, lastWeekLogs, onEdit, onAd
 }
 
 // ── Main Workout Component ────────────────────────────────────────────────────
-export default function Workout({ workoutActive, workoutElapsed, workoutRunning, onStartWorkout, onStopWorkout, onToggleTimer }) {
-  const [programs, setPrograms] = useState([])
+export default function Workout({ workoutActive, workoutElapsed, workoutRunning, onStartWorkout, onStopWorkout, onToggleTimer, recoveryScore }) {
   const [todayLogs, setTodayLogs] = useState({})
   const [lastWeekLogs, setLastWeekLogs] = useState({})
   const [chartData, setChartData] = useState({})
@@ -769,7 +773,10 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
     }
   }
 
-  const startRest = (secs) => setRestTimer({ secs, key: Date.now() })
+ const startRest = (secs) => {
+  const adjusted = getRecommendedRest(secs, recoveryScore)
+  setRestTimer({ secs: adjusted, key: Date.now() })
+}
 
   const openAddProg = () => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setShowAddProg(true) }
   const openEditProg = (e, p) => { e.stopPropagation(); setEditingProg(p); setProgForm({ name: p.name, tag: p.tag }); setShowAddProg(true) }
@@ -874,6 +881,26 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
 
           {selected && prog && (
             <>
+              {recoveryScore !== null && recoveryScore !== undefined && (
+  <div style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '12px 16px', borderRadius: '16px',
+    background: recoveryScore >= 67 ? 'rgba(16,185,129,0.1)' : recoveryScore >= 34 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
+    border: `1px solid ${recoveryScore >= 67 ? 'rgba(16,185,129,0.3)' : recoveryScore >= 34 ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`,
+  }}>
+    <div>
+      <p style={{ fontSize: '13px', fontWeight: '600', color: recoveryScore >= 67 ? '#10B981' : recoveryScore >= 34 ? '#F59E0B' : '#EF4444' }}>
+        {recoveryScore >= 67 ? 'Well recovered' : recoveryScore >= 34 ? 'Moderate recovery' : 'Low recovery'}
+      </p>
+      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
+        Sleep performance {recoveryScore}% · Recommended rest: {recoveryScore >= 67 ? 'shorter' : recoveryScore >= 34 ? 'normal' : 'longer'}
+      </p>
+    </div>
+    <span style={{ fontSize: '22px', fontWeight: '700', color: recoveryScore >= 67 ? '#10B981' : recoveryScore >= 34 ? '#F59E0B' : '#EF4444' }}>{recoveryScore}%</span>
+  </div>
+)}
+{workoutActive && (
+  <WorkoutTimer
               {workoutActive && (
                 <WorkoutTimer
                   elapsed={workoutElapsed}

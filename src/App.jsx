@@ -11,7 +11,20 @@ export default function App() {
   const [workoutActive, setWorkoutActive] = useState(false)
   const [workoutElapsed, setWorkoutElapsed] = useState(0)
   const [workoutRunning, setWorkoutRunning] = useState(false)
+  const [whoopData, setWhoopData] = useState(null)
   const intervalRef = useRef(null)
+
+  // Fetch Whoop data once at app level
+  useEffect(() => {
+    fetch(`/api/whoop/data?t=${Date.now()}`)
+      .then(r => r.json())
+      .then(d => setWhoopData(d))
+      .catch(() => null)
+  }, [])
+
+  // Derive recovery score from Whoop data
+  const sleepPerf = whoopData?.sleep?.records?.[0]?.score?.sleep_performance_percentage || null
+  const recoveryScore = sleepPerf // will update when cycle recovery is available
 
   useEffect(() => {
     if (workoutRunning) {
@@ -41,7 +54,6 @@ export default function App() {
       onTouchStart={e => { if (e.touches.length > 1) e.preventDefault() }}
       onTouchMove={e => { if (e.touches.length > 1) e.preventDefault() }}
     >
-      {/* Keep all tabs mounted but hide inactive ones so timers persist */}
       <div style={{ display: tab === 'home' ? 'block' : 'none', minHeight: '100dvh', paddingBottom: '90px' }}>
         <Home setTab={setTab} />
       </div>
@@ -56,10 +68,11 @@ export default function App() {
           onStartWorkout={startWorkout}
           onStopWorkout={stopWorkout}
           onToggleTimer={toggleWorkoutTimer}
+          recoveryScore={recoveryScore}
         />
       </div>
       <div style={{ display: tab === 'recovery' ? 'block' : 'none', minHeight: '100dvh', paddingBottom: '90px' }}>
-        <Recovery />
+        <Recovery whoopData={whoopData} />
       </div>
       <div style={{ display: tab === 'spirit' ? 'block' : 'none', minHeight: '100dvh', paddingBottom: '90px' }}>
         <Spirit />
