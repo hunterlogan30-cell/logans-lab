@@ -37,9 +37,13 @@ export default async function handler(req, res) {
       `https://api.prod.whoop.com/developer/v1/cycle/${latestCycleId}/recovery`,
       { headers }
     );
+    console.log('recovery status:', recoveryRes.status, 'cycleId:', latestCycleId);
+    const recoveryText = await recoveryRes.text();
+    console.log('recovery body:', recoveryText);
     if (recoveryRes.status === 200) {
-      recovery = await recoveryRes.json();
+      recovery = JSON.parse(recoveryText);
     }
   }
+
   res.json({ cycles, sleep, recovery });
 }
