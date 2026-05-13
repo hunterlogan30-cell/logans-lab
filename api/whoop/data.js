@@ -11,51 +11,17 @@ async function getValidToken() {
     .select('*')
     .eq('id', 1)
     .single();
-
-  if (!data?.access_token) return null;
-
-  if (Date.now() > data.expires_at - 60000) {
-    await fetch('https://logans-lab.vercel.app/api/whoop/refresh');
-    const { data: refreshed } = await supabase
-      .from('whoop_tokens')
-      .select('access_token')
-      .eq('id', 1)
-      .single();
-    return refreshed?.access_token;
-  }
-
-  return data.access_token;
+  return data?.access_token || null;
 }
 
 export default async function handler(req, res) {
   const token = await getValidToken();
+  if (!token) return res.status(401).json({ error: 'Not connected to Whoop' });
 
-  if (!token) {
-    return res.status(401).json({ error: 'Not connected to Whoop' });
-  }
+  const headers = { Authorization: `Bearer ${token}` };
 
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    'Content-Type': 'application/json'
-  };
+  const cycleRes = await fetch('https://api.prod.whoop.com/developer/v1/cycle?limit=7', { headers });
+  const cycles = await cycleRes.json();
 
-  try {
-    const [sleepRes, cycleRes] = await Promise.all([
-      fetch('https://api.prod.whoop.com/developer/v2/activity/sleep?limit=1', { headers }),
-      fetch('https://api.prod.whoop.com/developer/v1/cycle?limit=7', { headers }),
-    ]);
-
-    const sleepText = await sleepRes.text();
-    const cycleText = await cycleRes.text();
-
-    const sleep = JSON.parse(sleepText);
-    const cycles = JSON.parse(cycleText);
-
-    // Recovery is embedded in cycles — extract from most recent cycle
-    const latestCycle = cycles.records?.[0];
-
-    res.json({ sleep, cycles, latestCycle });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  res.json({ cycles });
 }
