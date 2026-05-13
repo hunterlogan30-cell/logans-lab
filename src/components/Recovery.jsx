@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const glass = {
   background: 'rgba(255,255,255,0.1)',
@@ -36,34 +36,103 @@ const DumbbellIcon = () => (
   </svg>
 )
 
-const metrics = [
-  { key: 'hrv', label: 'HRV', value: '68', unit: 'ms', change: '+4', good: true, icon: <ActivityIcon /> },
-  { key: 'rhr', label: 'Resting HR', value: '52', unit: 'bpm', change: '-2', good: true, icon: <HeartIcon /> },
-  { key: 'sleep', label: 'Sleep', value: '8.2', unit: 'hrs', change: '+0.4', good: true, icon: <MoonIcon /> },
-  { key: 'strain', label: 'Strain', value: '14.2', unit: '/21', change: '+1.8', good: false, icon: <DumbbellIcon /> },
-]
+function msToHrs(ms) {
+  return (ms / 3600000).toFixed(1)
+}
 
-const sleepStages = [
-  { label: 'Awake', pct: 5, color: 'rgba(255,255,255,0.3)' },
-  { label: 'REM', pct: 22, color: 'rgba(99,102,241,0.8)' },
-  { label: 'Light', pct: 43, color: 'rgba(99,102,241,0.45)' },
-  { label: 'Deep', pct: 30, color: '#10B981' },
-]
-
-const weekHRV = [58, 62, 55, 70, 65, 68, 68]
-const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
-
-const tips = [
-  { text: 'Hydrate well — aim for 3L today', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg> },
-  { text: 'Light stretching or yoga recommended', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c0 0-8-4.5-8-11a8 8 0 0 1 16 0c0 6.5-8 11-8 11z"/></svg> },
-  { text: 'Target 10pm bedtime for optimal HRV', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> },
-]
+function getTips(score) {
+  if (score >= 67) return [
+    { text: 'Great recovery — push hard today', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
+    { text: 'Hydrate well — aim for 3L today', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg> },
+    { text: 'Target 10pm bedtime for optimal HRV', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> },
+  ]
+  if (score >= 34) return [
+    { text: 'Moderate effort only today', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
+    { text: 'Light stretching or yoga recommended', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c0 0-8-4.5-8-11a8 8 0 0 1 16 0c0 6.5-8 11-8 11z"/></svg> },
+    { text: 'Prioritize sleep tonight', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> },
+  ]
+  return [
+    { text: 'Rest day — let your body recover', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> },
+    { text: 'Hydrate and avoid alcohol', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg> },
+    { text: 'Get to bed early tonight', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> },
+  ]
+}
 
 export default function Recovery() {
-  const whoopScore = 78
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    fetch('/api/whoop/data')
+      .then(r => r.json())
+      .then(d => { setData(d); setLoading(false) })
+      .catch(e => { setError(e.message); setLoading(false) })
+  }, [])
+
+  if (loading) return (
+    <div style={{ padding: '48px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p style={{ color: 'rgba(255,255,255,0.5)' }}>Loading Whoop data...</p>
+    </div>
+  )
+
+  if (error || !data) return (
+    <div style={{ padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+      <p style={{ color: 'rgba(255,255,255,0.5)' }}>Not connected to Whoop</p>
+      <a href="/api/whoop/auth" style={{
+        padding: '12px 24px', borderRadius: '14px',
+        background: 'linear-gradient(135deg, #6366F1, #4F46E5)',
+        color: 'white', fontWeight: '600', fontSize: '14px', textDecoration: 'none'
+      }}>Connect Whoop</a>
+    </div>
+  )
+
+  // Parse sleep data
+  const sleep = data.sleep?.records?.[0]
+  const sleepScore = sleep?.score
+  const stages = sleepScore?.stage_summary
+  const totalSleepMs = stages
+    ? stages.total_light_sleep_time_milli + stages.total_slow_wave_sleep_time_milli + stages.total_rem_sleep_time_milli
+    : 0
+  const totalInBedMs = stages?.total_in_bed_time_milli || 1
+  const awakePct = stages ? Math.round(stages.total_awake_time_milli / totalInBedMs * 100) : 0
+  const remPct = stages ? Math.round(stages.total_rem_sleep_time_milli / totalInBedMs * 100) : 0
+  const lightPct = stages ? Math.round(stages.total_light_sleep_time_milli / totalInBedMs * 100) : 0
+  const deepPct = stages ? Math.round(stages.total_slow_wave_sleep_time_milli / totalInBedMs * 100) : 0
+  const sleepHrs = msToHrs(totalSleepMs)
+  const sleepPerf = sleepScore?.sleep_performance_percentage || 0
+
+  // Parse cycle/strain data
+  const cycles = data.cycles?.records || []
+  const todayCycle = cycles[0]
+  const todayStrain = todayCycle?.score?.strain?.toFixed(1) || '0'
+  const avgHR = todayCycle?.score?.average_heart_rate || 0
+
+  // Weekly strain for chart
+  const weekStrains = [...cycles].reverse().map(c => c.score?.strain || 0)
+  const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+  const maxStrain = Math.max(...weekStrains, 1)
+
+  // Recovery score from sleep performance
+  const whoopScore = sleepPerf
   const scoreColor = whoopScore >= 67 ? '#10B981' : whoopScore >= 34 ? '#F59E0B' : '#EF4444'
   const scoreLabel = whoopScore >= 67 ? 'Green — Go for it' : whoopScore >= 34 ? 'Yellow — Be careful' : 'Red — Rest up'
-  const maxHRV = Math.max(...weekHRV)
+
+  const metrics = [
+    { key: 'sleep', label: 'Sleep', value: sleepHrs, unit: 'hrs', icon: <MoonIcon /> },
+    { key: 'strain', label: 'Strain', value: todayStrain, unit: '/21', icon: <DumbbellIcon /> },
+    { key: 'rhr', label: 'Avg HR', value: avgHR, unit: 'bpm', icon: <HeartIcon /> },
+    { key: 'efficiency', label: 'Efficiency', value: sleepScore?.sleep_efficiency_percentage?.toFixed(0) || '--', unit: '%', icon: <ActivityIcon /> },
+  ]
+
+  const sleepStages = [
+    { label: 'Awake', pct: awakePct, color: 'rgba(255,255,255,0.3)' },
+    { label: 'REM', pct: remPct, color: 'rgba(99,102,241,0.8)' },
+    { label: 'Light', pct: lightPct, color: 'rgba(99,102,241,0.45)' },
+    { label: 'Deep', pct: deepPct, color: '#10B981' },
+  ]
+
+  const tips = getTips(whoopScore)
 
   return (
     <div style={{ padding: '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -75,7 +144,7 @@ export default function Recovery() {
 
       {/* Recovery score ring */}
       <div style={{ ...glass, padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
-        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: '500' }}>Today's Recovery</p>
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: '500' }}>Sleep Performance</p>
         <div style={{ position: 'relative', width: '140px', height: '140px' }}>
           <svg width="140" height="140" viewBox="0 0 140 140">
             <circle cx="70" cy="70" r="58" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="10"/>
@@ -100,11 +169,6 @@ export default function Recovery() {
           <div key={m.key} style={{ ...glass, padding: '16px', borderRadius: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ ...iconBg, width: '36px', height: '36px', borderRadius: '12px' }}>{m.icon}</div>
-              <span style={{
-                fontSize: '11px', fontWeight: '600', padding: '3px 8px', borderRadius: '10px',
-                background: m.good ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.1)',
-                color: m.good ? '#10B981' : 'rgba(255,255,255,0.5)',
-              }}>{m.change}</span>
             </div>
             <p style={{ fontSize: '26px', fontWeight: '700', marginTop: '12px', lineHeight: 1 }}>
               {m.value}
@@ -134,13 +198,13 @@ export default function Recovery() {
         </div>
       </div>
 
-      {/* HRV bar chart */}
+      {/* Weekly strain chart */}
       <div style={{ ...glass, padding: '20px' }}>
-        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>HRV This Week</h3>
+        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>Strain This Week</h3>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '64px' }}>
-          {weekHRV.map((v, i) => {
-            const h = Math.round((v / maxHRV) * 64)
-            const isToday = i === 6
+          {weekStrains.map((v, i) => {
+            const h = Math.round((v / maxStrain) * 64)
+            const isToday = i === weekStrains.length - 1
             return (
               <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                 <div style={{
@@ -149,7 +213,9 @@ export default function Recovery() {
                     ? 'linear-gradient(180deg, #6366F1, #4F46E5)'
                     : 'rgba(255,255,255,0.15)',
                 }} />
-                <span style={{ fontSize: '10px', color: isToday ? 'rgba(199,200,255,0.9)' : 'rgba(255,255,255,0.35)', fontWeight: isToday ? '600' : '400' }}>{weekDays[i]}</span>
+                <span style={{ fontSize: '10px', color: isToday ? 'rgba(199,200,255,0.9)' : 'rgba(255,255,255,0.35)', fontWeight: isToday ? '600' : '400' }}>
+                  {weekDays[i % 7]}
+                </span>
               </div>
             )
           })}
