@@ -858,8 +858,8 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
     setSelected(p.id)
     onStartWorkout()
   }
-}}
-                <div style={iconBg}>{p.tag === 'Cardio' ? <HeartIcon /> : <DumbbellIcon />}</div>
+}} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '20px', cursor: 'pointer', background: selected === p.id ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.08)', border: `1px solid ${selected === p.id ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.15)'}`, fontFamily: 'Inter, sans-serif', textAlign: 'left', transition: 'all 0.2s', width: '100%' }}>
+  <div style={iconBg}>{p.tag === 'Cardio' ? <HeartIcon /> : <DumbbellIcon />}</div>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: '15px', fontWeight: '600', color: '#fff' }}>{p.name}</p>
                   <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{p.exercises?.length || 0} exercises · {p.tag}</p>
