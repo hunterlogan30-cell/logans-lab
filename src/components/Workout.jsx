@@ -700,7 +700,8 @@ function SortableExerciseList({ exercises, todayLogs, lastWeekLogs, onEdit, onAd
 
 // ── Main Workout Component ────────────────────────────────────────────────────
 export default function Workout({ workoutActive, workoutElapsed, workoutRunning, onStartWorkout, onStopWorkout, onToggleTimer, recoveryScore }) {
-  const [todayLogs, setTodayLogs] = useState({})
+  const [programs, setPrograms] = useState([])
+    const [todayLogs, setTodayLogs] = useState({})
   const [lastWeekLogs, setLastWeekLogs] = useState({})
   const [chartData, setChartData] = useState({})
   const [selected, setSelected] = useState(null)
