@@ -20,19 +20,27 @@ export default async function handler(req, res) {
 
   const headers = { Authorization: `Bearer ${token}` };
 
+  // Fetch cycles and sleep in parallel
   const [cycleRes, sleepRes] = await Promise.all([
     fetch('https://api.prod.whoop.com/developer/v1/cycle?limit=7', { headers }),
     fetch('https://api.prod.whoop.com/developer/v2/activity/sleep?limit=1', { headers }),
   ]);
 
   const cycles = await cycleRes.json();
-  const sleepText = await sleepRes.text();
+  const sleep = await sleepRes.json();
 
-  console.log('sleep status:', sleepRes.status);
-  console.log('sleep body:', sleepText);
+  // Get recovery for the most recent cycle
+  const latestCycleId = cycles.records?.[0]?.id;
+  let recovery = null;
+  if (latestCycleId) {
+    const recoveryRes = await fetch(
+      `https://api.prod.whoop.com/developer/v1/cycle/${latestCycleId}/recovery`,
+      { headers }
+    );
+    if (recoveryRes.status === 200) {
+      recovery = await recoveryRes.json();
+    }
+  }
 
-  let sleep = null;
-  try { sleep = JSON.parse(sleepText); } catch (e) { sleep = { error: sleepText }; }
-
-  res.json({ cycles, sleep });
+  res.json({ cycles, sleep, recovery });
 }
