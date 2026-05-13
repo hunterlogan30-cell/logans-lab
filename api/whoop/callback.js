@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   const code = url.searchParams.get('code');
 
   if (!code) {
-    return res.status(400).send('No code provided — url was: ' + req.url);
+   return res.status(400).send('No code provided — url was: ' + req.url + ' query: ' + JSON.stringify(req.query));
   }
 
   // Exchange code for tokens
