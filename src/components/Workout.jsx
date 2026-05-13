@@ -899,8 +899,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
     <span style={{ fontSize: '22px', fontWeight: '700', color: recoveryScore >= 67 ? '#10B981' : recoveryScore >= 34 ? '#F59E0B' : '#EF4444' }}>{recoveryScore}%</span>
   </div>
 )}
-{workoutActive && (
-  <WorkoutTimer
+
               {workoutActive && (
                 <WorkoutTimer
                   elapsed={workoutElapsed}
