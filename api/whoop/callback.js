@@ -6,10 +6,11 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
-  const { code } = req.query;
+  const url = new URL(req.url, 'https://logans-lab.vercel.app');
+  const code = url.searchParams.get('code');
 
   if (!code) {
-    return res.status(400).send('No code provided');
+    return res.status(400).send('No code provided — url was: ' + req.url);
   }
 
   // Exchange code for tokens
