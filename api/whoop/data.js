@@ -20,8 +20,19 @@ export default async function handler(req, res) {
 
   const headers = { Authorization: `Bearer ${token}` };
 
-  const cycleRes = await fetch('https://api.prod.whoop.com/developer/v1/cycle?limit=7', { headers });
-  const cycles = await cycleRes.json();
+  const [cycleRes, sleepRes] = await Promise.all([
+    fetch('https://api.prod.whoop.com/developer/v1/cycle?limit=7', { headers }),
+    fetch('https://api.prod.whoop.com/developer/v2/activity/sleep?limit=1', { headers }),
+  ]);
 
-  res.json({ cycles });
+  const cycles = await cycleRes.json();
+  const sleepText = await sleepRes.text();
+
+  console.log('sleep status:', sleepRes.status);
+  console.log('sleep body:', sleepText);
+
+  let sleep = null;
+  try { sleep = JSON.parse(sleepText); } catch (e) { sleep = { error: sleepText }; }
+
+  res.json({ cycles, sleep });
 }
