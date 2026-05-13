@@ -18,13 +18,13 @@ export default async function handler(req, res) {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      client_id: process.env.VITE_WHOOP_CLIENT_ID,
-      client_secret: process.env.VITE_WHOOP_CLIENT_SECRET,
-      redirect_uri: 'https://logans-lab.vercel.app/api/whoop/callback',
-    }),
-  });
+  grant_type: 'authorization_code',
+  code,
+  client_id: process.env.VITE_WHOOP_CLIENT_ID,
+  client_secret: process.env.VITE_WHOOP_CLIENT_SECRET,
+  redirect_uri: 'https://logans-lab.vercel.app/api/whoop/callback',
+  scope: 'read:recovery read:cycles read:sleep read:workout read:profile read:body_measurement offline',
+}),
 
   const tokens = await tokenRes.json();
 
