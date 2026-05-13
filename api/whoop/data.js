@@ -29,8 +29,8 @@ export default async function handler(req, res) {
   const cycles = await cycleRes.json();
   const sleep = await sleepRes.json();
 
-  // Get recovery for the most recent cycle
-  const latestCycleId = cycles.records?.[0]?.id;
+  // Get recovery for the most recent COMPLETED cycle
+  const latestCycleId = cycles.records?.find(c => c.end !== null)?.id;
   let recovery = null;
   if (latestCycleId) {
     const recoveryRes = await fetch(
@@ -41,6 +41,3 @@ export default async function handler(req, res) {
       recovery = await recoveryRes.json();
     }
   }
-
-  res.json({ cycles, sleep, recovery });
-}
