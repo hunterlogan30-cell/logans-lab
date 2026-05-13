@@ -5,45 +5,38 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
-async function getValidToken() {
-  const { data } = await supabase
+export default async function handler(req, res) {
+  // Get token
+  const { data: tokenData, error: tokenError } = await supabase
     .from('whoop_tokens')
     .select('*')
     .eq('id', 1)
     .single();
-  return data?.access_token || null;
-}
 
-export default async function handler(req, res) {
-  const token = await getValidToken();
-  if (!token) return res.status(401).json({ error: 'Not connected to Whoop' });
-
-  const headers = { Authorization: `Bearer ${token}` };
-
-  // Fetch cycles and sleep in parallel
-  const [cycleRes, sleepRes] = await Promise.all([
-    fetch('https://api.prod.whoop.com/developer/v1/cycle?limit=7', { headers }),
-    fetch('https://api.prod.whoop.com/developer/v2/activity/sleep?limit=1', { headers }),
-  ]);
-
-  const cycles = await cycleRes.json();
-  const sleep = await sleepRes.json();
-
-  // Get recovery for the most recent COMPLETED cycle
-  const latestCycleId = cycles.records?.find(c => c.end !== null)?.id;
-  let recovery = null;
-  if (latestCycleId) {
-    const recoveryRes = await fetch(
-      `https://api.prod.whoop.com/developer/v1/cycle/${latestCycleId}/recovery`,
-      { headers }
-    );
-    console.log('recovery status:', recoveryRes.status, 'cycleId:', latestCycleId);
-    const recoveryText = await recoveryRes.text();
-    console.log('recovery body:', recoveryText);
-    if (recoveryRes.status === 200) {
-      recovery = JSON.parse(recoveryText);
-    }
+  if (tokenError || !tokenData?.access_token) {
+    return res.status(401).json({ error: 'No token', tokenError, tokenData });
   }
 
-  res.json({ cycles, sleep, recovery });
+  const token = tokenData.access_token;
+  const headers = { Authorization: `Bearer ${token}` };
+
+  // Fetch all three in parallel
+  const [cycleRes, sleepRes, recoveryRes] = await Promise.all([
+    fetch('https://api.prod.whoop.com/developer/v1/cycle?limit=7', { headers }),
+    fetch('https://api.prod.whoop.com/developer/v2/activity/sleep?limit=1', { headers }),
+    fetch('https://api.prod.whoop.com/developer/v1/recovery?limit=1', { headers }),
+  ]);
+
+  const [cycles, sleep, recovery] = await Promise.all([
+    cycleRes.json(),
+    sleepRes.json(),
+    recoveryRes.text(),
+  ]);
+
+  res.json({
+    cycles,
+    sleep,
+    recoveryRaw: recovery,
+    recoveryStatus: recoveryRes.status,
+  });
 }
