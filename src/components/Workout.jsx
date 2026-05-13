@@ -525,10 +525,13 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: isVariant ? '11px 14px' : '14px 16px' }}>
         {!isVariant && (
-          <div {...dragHandleProps} style={{ cursor: 'grab', padding: '4px 2px', touchAction: 'none' }}>
-            <DragIcon />
-          </div>
-        )}
+  <div
+    {...dragHandleProps}
+    style={{ ...(dragHandleProps?.style || {}), cursor: 'grab', padding: '4px 6px', touchAction: 'none', userSelect: 'none' }}
+  >
+    <DragIcon />
+  </div>
+)}
         {isVariant && <div style={{ width: '2px', height: '28px', background: 'rgba(99,102,241,0.4)', borderRadius: '1px', flexShrink: 0 }} />}
 
         <div onClick={toggleDone} style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, cursor: 'pointer', background: exLog.done ? '#10B981' : 'rgba(255,255,255,0.1)', border: `2px solid ${exLog.done ? '#10B981' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -645,37 +648,120 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
 // ── Sortable list ────────────────────────────────────────────────────────────
 function SortableExerciseList({ exercises, progId, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, onReorder, onStartRest }) {
   const [items, setItems] = useState(exercises)
-  const dragIdx = useRef(null)
-  const dragOverIdx = useRef(null)
-  const [draggingId, setDraggingId] = useState(null)
+  const [draggingIdx, setDraggingIdx] = useState(null)
+  const [overIdx, setOverIdx] = useState(null)
+  const listRef = useRef(null)
+  const touchDragIdx = useRef(null)
+  const itemRefs = useRef([])
 
   useEffect(() => { setItems(exercises) }, [exercises])
 
+  // ── Desktop drag ──────────────────────────────────────────────────────────
   const handleDragStart = (e, i) => {
-    dragIdx.current = i
-    setDraggingId(items[i].id)
+    setDraggingIdx(i)
     e.dataTransfer.effectAllowed = 'move'
   }
 
   const handleDragEnter = (i) => {
-    if (dragIdx.current === null || dragIdx.current === i) return
-    dragOverIdx.current = i
+    if (draggingIdx === null || draggingIdx === i) return
+    setOverIdx(i)
     const next = [...items]
-    const [moved] = next.splice(dragIdx.current, 1)
+    const [moved] = next.splice(draggingIdx, 1)
     next.splice(i, 0, moved)
-    dragIdx.current = i
+    setDraggingIdx(i)
     setItems(next)
   }
 
   const handleDragEnd = async () => {
-    setDraggingId(null)
-    dragIdx.current = null
-    dragOverIdx.current = null
+    setDraggingIdx(null)
+    setOverIdx(null)
     onReorder(items)
     await Promise.all(items.map((ex, idx) =>
       supabase.from('exercises').update({ sort_order: idx }).eq('id', ex.id)
     ))
   }
+
+  // ── Touch drag (iOS) ──────────────────────────────────────────────────────
+  const handleTouchStart = (e, i) => {
+    touchDragIdx.current = i
+    setDraggingIdx(i)
+  }
+
+  const handleTouchMove = (e) => {
+    if (touchDragIdx.current === null) return
+    const touch = e.touches[0]
+    const list = listRef.current
+    if (!list) return
+
+    // Find which item we're hovering over
+    let targetIdx = null
+    itemRefs.current.forEach((el, idx) => {
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+        targetIdx = idx
+      }
+    })
+
+    if (targetIdx !== null && targetIdx !== touchDragIdx.current) {
+      const next = [...items]
+      const [moved] = next.splice(touchDragIdx.current, 1)
+      next.splice(targetIdx, 0, moved)
+      touchDragIdx.current = targetIdx
+      setDraggingIdx(targetIdx)
+      setItems(next)
+    }
+  }
+
+  const handleTouchEnd = async () => {
+    setDraggingIdx(null)
+    touchDragIdx.current = null
+    onReorder(items)
+    await Promise.all(items.map((ex, idx) =>
+      supabase.from('exercises').update({ sort_order: idx }).eq('id', ex.id)
+    ))
+  }
+
+  return (
+    <div ref={listRef} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {items.map((ex, i) => (
+        <div
+          key={ex.id}
+          ref={el => itemRefs.current[i] = el}
+          draggable
+          onDragStart={e => handleDragStart(e, i)}
+          onDragEnter={() => handleDragEnter(i)}
+          onDragEnd={handleDragEnd}
+          onDragOver={e => e.preventDefault()}
+          style={{
+            opacity: draggingIdx === i ? 0.4 : 1,
+            transform: draggingIdx === i ? 'scale(0.98)' : 'scale(1)',
+            transition: 'opacity 0.15s, transform 0.15s',
+          }}
+        >
+          <ExerciseRow
+            ex={ex}
+            todayLogs={todayLogs}
+            lastWeekLogs={lastWeekLogs}
+            onEdit={onEdit}
+            onAddVariant={onAddVariant}
+            allCharts={allCharts}
+            setAllCharts={setAllCharts}
+            onLogChange={onLogChange}
+            chartData={chartData[ex.id]}
+            onStartRest={onStartRest}
+            dragHandleProps={{
+              onTouchStart: e => handleTouchStart(e, i),
+              onTouchMove: handleTouchMove,
+              onTouchEnd: handleTouchEnd,
+              style: { cursor: 'grab', padding: '4px 2px', touchAction: 'none', userSelect: 'none' }
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

@@ -22,19 +22,33 @@ export default function App() {
     return () => clearInterval(intervalRef.current)
   }, [workoutRunning])
 
-  const startWorkout = () => { setWorkoutActive(true); setWorkoutElapsed(0); setWorkoutRunning(false) }
-  const stopWorkout = () => { setWorkoutActive(false); setWorkoutElapsed(0); setWorkoutRunning(false) }
+  const startWorkout = () => {
+    setWorkoutActive(true)
+    setWorkoutElapsed(0)
+    setWorkoutRunning(false)
+  }
+
+  const stopWorkout = () => {
+    setWorkoutActive(false)
+    setWorkoutElapsed(0)
+    setWorkoutRunning(false)
+  }
+
   const toggleWorkoutTimer = () => setWorkoutRunning(r => !r)
 
   return (
     <div
-      style={{ minHeight: '100dvh', paddingBottom: '90px' }}
       onTouchStart={e => { if (e.touches.length > 1) e.preventDefault() }}
       onTouchMove={e => { if (e.touches.length > 1) e.preventDefault() }}
     >
-      {tab === 'home' && <Home setTab={setTab} />}
-      {tab === 'schedule' && <Schedule />}
-      {tab === 'workout' && (
+      {/* Keep all tabs mounted but hide inactive ones so timers persist */}
+      <div style={{ display: tab === 'home' ? 'block' : 'none', minHeight: '100dvh', paddingBottom: '90px' }}>
+        <Home setTab={setTab} />
+      </div>
+      <div style={{ display: tab === 'schedule' ? 'block' : 'none', minHeight: '100dvh', paddingBottom: '90px' }}>
+        <Schedule />
+      </div>
+      <div style={{ display: tab === 'workout' ? 'block' : 'none', minHeight: '100dvh', paddingBottom: '90px' }}>
         <Workout
           workoutActive={workoutActive}
           workoutElapsed={workoutElapsed}
@@ -43,9 +57,13 @@ export default function App() {
           onStopWorkout={stopWorkout}
           onToggleTimer={toggleWorkoutTimer}
         />
-      )}
-      {tab === 'recovery' && <Recovery />}
-      {tab === 'spirit' && <Spirit />}
+      </div>
+      <div style={{ display: tab === 'recovery' ? 'block' : 'none', minHeight: '100dvh', paddingBottom: '90px' }}>
+        <Recovery />
+      </div>
+      <div style={{ display: tab === 'spirit' ? 'block' : 'none', minHeight: '100dvh', paddingBottom: '90px' }}>
+        <Spirit />
+      </div>
       <BottomNav tab={tab} setTab={setTab} />
     </div>
   )
