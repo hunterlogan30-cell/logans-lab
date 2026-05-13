@@ -60,77 +60,54 @@ const fmtTime = (s) => {
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
   const sec = s % 60
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
-  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
 }
 
-// Beep sound using Web Audio API
 const playBeep = () => {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)()
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
     osc.connect(gain); gain.connect(ctx.destination)
-    osc.frequency.value = 880
-    osc.type = 'sine'
+    osc.frequency.value = 880; osc.type = 'sine'
     gain.gain.setValueAtTime(0.5, ctx.currentTime)
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6)
     osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.6)
-  } catch (e) {}
+  } catch(e) {}
 }
 
-const vibrate = (pattern = [200, 100, 200]) => {
-  try { if (navigator.vibrate) navigator.vibrate(pattern) } catch (e) {}
+const vibrate = (pattern = [200,100,200]) => {
+  try { if (navigator.vibrate) navigator.vibrate(pattern) } catch(e) {}
 }
 
-// ── Workout timer ────────────────────────────────────────────────────────────
+// ── Workout Timer ─────────────────────────────────────────────────────────────
 function WorkoutTimer({ elapsed, running, onToggle, onStop }) {
   return (
     <div style={{ ...glass, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div style={{
-          width: '8px', height: '8px', borderRadius: '50%',
-          background: running ? '#10B981' : 'rgba(255,255,255,0.3)',
-          boxShadow: running ? '0 0 8px #10B981' : 'none',
-          animation: running ? 'pulse 1.5s infinite' : 'none'
-        }} />
+        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: running ? '#10B981' : 'rgba(255,255,255,0.3)', boxShadow: running ? '0 0 8px #10B981' : 'none', animation: running ? 'pulse 1.5s infinite' : 'none' }} />
         <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>Workout time</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span style={{ fontSize: '22px', fontWeight: '700', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(elapsed)}</span>
-        <button onClick={onToggle} style={{
-          padding: '6px 14px', borderRadius: '10px', cursor: 'pointer',
-          background: running ? 'rgba(255,255,255,0.1)' : 'rgba(99,102,241,0.4)',
-          border: `1px solid ${running ? 'rgba(255,255,255,0.2)' : 'rgba(99,102,241,0.5)'}`,
-          color: '#fff', fontSize: '12px', fontFamily: 'Inter, sans-serif', fontWeight: '500'
-        }}>
+        <button onClick={onToggle} style={{ padding: '6px 14px', borderRadius: '10px', cursor: 'pointer', background: running ? 'rgba(255,255,255,0.1)' : 'rgba(99,102,241,0.4)', border: `1px solid ${running ? 'rgba(255,255,255,0.2)' : 'rgba(99,102,241,0.5)'}`, color: '#fff', fontSize: '12px', fontFamily: 'Inter, sans-serif', fontWeight: '500' }}>
           {running ? 'Pause' : 'Start'}
         </button>
-        <button onClick={onStop} style={{
-          padding: '6px 10px', borderRadius: '10px', cursor: 'pointer',
-          background: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontFamily: 'Inter, sans-serif'
-        }}>End</button>
+        <button onClick={onStop} style={{ padding: '6px 10px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontFamily: 'Inter, sans-serif' }}>End</button>
       </div>
       <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
     </div>
   )
 }
 
-// ── Rest timer ───────────────────────────────────────────────────────────────
+// ── Rest Timer ────────────────────────────────────────────────────────────────
 function RestTimer({ restSeconds, onDismiss }) {
   const [remaining, setRemaining] = useState(restSeconds)
   const [editTime, setEditTime] = useState(false)
   const [customSecs, setCustomSecs] = useState(restSeconds)
   const intervalRef = useRef(null)
   const hasAlerted = useRef(false)
-
-  useEffect(() => {
-    setRemaining(restSeconds)
-    setCustomSecs(restSeconds)
-    hasAlerted.current = false
-  }, [restSeconds])
 
   useEffect(() => {
     intervalRef.current = setInterval(() => {
@@ -140,7 +117,7 @@ function RestTimer({ restSeconds, onDismiss }) {
           if (!hasAlerted.current) {
             hasAlerted.current = true
             playBeep()
-            vibrate([300, 100, 300, 100, 300])
+            vibrate([300,100,300,100,300])
           }
           return 0
         }
@@ -164,11 +141,7 @@ function RestTimer({ restSeconds, onDismiss }) {
       setRemaining(r => {
         if (r <= 1) {
           clearInterval(intervalRef.current)
-          if (!hasAlerted.current) {
-            hasAlerted.current = true
-            playBeep()
-            vibrate([300, 100, 300, 100, 300])
-          }
+          if (!hasAlerted.current) { hasAlerted.current = true; playBeep(); vibrate([300,100,300,100,300]) }
           return 0
         }
         return r - 1
@@ -186,11 +159,7 @@ function RestTimer({ restSeconds, onDismiss }) {
         setRemaining(r => {
           if (r <= 1) {
             clearInterval(intervalRef.current)
-            if (!hasAlerted.current) {
-              hasAlerted.current = true
-              playBeep()
-              vibrate([300, 100, 300, 100, 300])
-            }
+            if (!hasAlerted.current) { hasAlerted.current = true; playBeep(); vibrate([300,100,300,100,300]) }
             return 0
           }
           return r - 1
@@ -200,8 +169,7 @@ function RestTimer({ restSeconds, onDismiss }) {
   }
 
   return (
-    <div style={{ position: 'fixed', bottom: '100px', left: '50%', transform: 'translateX(-50%)', width: 'calc(100% - 32px)', maxWidth: '414px', zIndex: 150, background: isDone ? 'rgba(16,185,129,0.95)' : 'rgba(18,27,46,0.97)', border: `1px solid ${isDone ? 'rgba(16,185,129,0.5)' : 'rgba(99,102,241,0.4)'}`, borderRadius: '24px', padding: '16px 20px', backdropFilter: 'blur(20px)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
-
+    <div style={{ position: 'fixed', bottom: '100px', left: '50%', transform: 'translateX(-50%)', width: 'calc(100% - 32px)', maxWidth: '414px', zIndex: 150, background: isDone ? 'rgba(16,185,129,0.95)' : 'rgba(18,27,46,0.97)', border: `1px solid ${isDone ? 'rgba(16,185,129,0.5)' : 'rgba(99,102,241,0.4)'}`, borderRadius: '24px', padding: '16px 20px', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
       {isDone ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
@@ -216,9 +184,7 @@ function RestTimer({ restSeconds, onDismiss }) {
             <p style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.8)' }}>Rest timer</p>
             <button onClick={onDismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: '18px', padding: '0' }}>×</button>
           </div>
-
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* Ring */}
             <div style={{ position: 'relative', width: '72px', height: '72px', flexShrink: 0 }}>
               <svg width="72" height="72" viewBox="0 0 72 72">
                 <circle cx="36" cy="36" r="28" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="5"/>
@@ -232,24 +198,20 @@ function RestTimer({ restSeconds, onDismiss }) {
                 <span style={{ fontSize: '15px', fontWeight: '700', color: remaining < 10 ? '#EF4444' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(remaining)}</span>
               </div>
             </div>
-
             <div style={{ flex: 1 }}>
-              {/* Adjust buttons */}
               <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
-                {[-30, -15, +15, +30].map(s => (
+                {[-30,-15,+15,+30].map(s => (
                   <button key={s} onClick={() => addTime(s)} style={{ flex: 1, padding: '7px 0', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: '12px', fontFamily: 'Inter, sans-serif', fontWeight: '500' }}>
                     {s > 0 ? `+${s}s` : `${s}s`}
                   </button>
                 ))}
               </div>
-
-              {/* Custom time */}
               {editTime ? (
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <input type="number" value={customSecs} onChange={e => setCustomSecs(e.target.value)}
                     style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '10px', padding: '8px 10px', color: '#fff', fontSize: '14px', fontFamily: 'Inter, sans-serif', outline: 'none' }} />
                   <button onClick={applyCustom} style={{ padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(99,102,241,0.5)', border: 'none', color: '#fff', fontSize: '13px', fontFamily: 'Inter, sans-serif' }}>Set</button>
-                  <button onClick={() => setEditTime(false)} style={{ padding: '8px 10px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontFamily: 'Inter, sans-serif' }}>Cancel</button>
+                  <button onClick={() => setEditTime(false)} style={{ padding: '8px 10px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontFamily: 'Inter, sans-serif' }}>×</button>
                 </div>
               ) : (
                 <button onClick={() => setEditTime(true)} style={{ width: '100%', padding: '7px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontFamily: 'Inter, sans-serif' }}>
@@ -264,7 +226,7 @@ function RestTimer({ restSeconds, onDismiss }) {
   )
 }
 
-// ── Progress chart ───────────────────────────────────────────────────────────
+// ── Progress Chart ────────────────────────────────────────────────────────────
 function ProgressChart({ data, unit = 'lbs' }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
@@ -311,29 +273,24 @@ function ProgressChart({ data, unit = 'lbs' }) {
     const pts = getPoints(W, H)
     ctx.clearRect(0, 0, W, H)
     if (pts.length < 2) return
-
     const vals = data.map(d => parseFloat(d.value) || 0)
     const minV = Math.max(0, Math.min(...vals) * 0.97)
     const maxV = Math.max(...vals) * 1.03 || 100
-
     ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'right'
     ;[0, 0.5, 1].forEach(pct => {
       const v = (minV + pct * (maxV - minV)).toFixed(1)
       const y = PAD.T + chartH - pct * chartH
       ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillText(v, PAD.L - 5, y + 4)
-      ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3])
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.setLineDash([3,3])
       ctx.beginPath(); ctx.moveTo(PAD.L, y); ctx.lineTo(W - PAD.R, y); ctx.stroke(); ctx.setLineDash([])
     })
-
     const grad = ctx.createLinearGradient(0, PAD.T, 0, PAD.T + chartH)
     grad.addColorStop(0, 'rgba(99,102,241,0.35)'); grad.addColorStop(1, 'rgba(99,102,241,0)')
     ctx.beginPath(); ctx.moveTo(pts[0].x, PAD.T + chartH)
     pts.forEach(p => ctx.lineTo(p.x, p.y))
-    ctx.lineTo(pts[pts.length - 1].x, PAD.T + chartH); ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
-
+    ctx.lineTo(pts[pts.length-1].x, PAD.T + chartH); ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
     ctx.beginPath(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round'
     pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)); ctx.stroke()
-
     ctx.textAlign = 'center'; ctx.font = '10px Inter, sans-serif'
     pts.forEach(p => {
       ctx.fillStyle = p.idx === hiIdx ? '#fff' : 'rgba(255,255,255,0.4)'
@@ -341,12 +298,12 @@ function ProgressChart({ data, unit = 'lbs' }) {
     })
     pts.forEach(p => {
       const hi = p.idx === hiIdx
-      if (hi) { ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill() }
-      ctx.beginPath(); ctx.arc(p.x, p.y, hi ? 5 : 3, 0, Math.PI * 2); ctx.fillStyle = hi ? '#fff' : 'rgba(255,255,255,0.6)'; ctx.fill()
+      if (hi) { ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill() }
+      ctx.beginPath(); ctx.arc(p.x, p.y, hi ? 5 : 3, 0, Math.PI*2); ctx.fillStyle = hi ? '#fff' : 'rgba(255,255,255,0.6)'; ctx.fill()
     })
     if (hiIdx !== null && pts[hiIdx]) {
       const p = pts[hiIdx]
-      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3])
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([3,3])
       ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, PAD.T + chartH); ctx.stroke(); ctx.setLineDash([])
     }
   }
@@ -387,7 +344,7 @@ function ProgressChart({ data, unit = 'lbs' }) {
   )
 }
 
-// ── Body weight section ──────────────────────────────────────────────────────
+// ── Body Weight Section ───────────────────────────────────────────────────────
 function BodyWeightSection() {
   const [logs, setLogs] = useState([])
   const [todayLog, setTodayLog] = useState(null)
@@ -458,7 +415,7 @@ function BodyWeightSection() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Progress</h3>
             <div style={{ display: 'flex', gap: '6px' }}>
-              {[['week', '1W'], ['month', '1M'], ['3month', '3M'], ['all', 'All']].map(([val, label]) => (
+              {[['week','1W'],['month','1M'],['3month','3M'],['all','All']].map(([val, label]) => (
                 <button key={val} onClick={() => setRange(val)} style={{ padding: '4px 10px', borderRadius: '10px', cursor: 'pointer', background: range === val ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)', border: `1px solid ${range === val ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.15)'}`, color: range === val ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: '11px', fontFamily: 'Inter, sans-serif' }}>{label}</button>
               ))}
             </div>
@@ -466,12 +423,16 @@ function BodyWeightSection() {
           {chartData.length >= 2 ? <ProgressChart data={chartData} unit="lbs" /> : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '20px 0' }}>Log more days to see your chart.</p>}
           {filtered.length >= 2 && (() => {
             const vals = filtered.map(l => parseFloat(l.weight_lbs))
-            const start = vals[0], end = vals[vals.length - 1]
-            const total = (end - start).toFixed(1)
-            const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)
+            const total = (vals[vals.length-1] - vals[0]).toFixed(1)
+            const avg = (vals.reduce((a,b) => a+b, 0) / vals.length).toFixed(1)
             return (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px', marginTop: '14px' }}>
-                {[{ label: 'Change', value: `${parseFloat(total) > 0 ? '+' : ''}${total}`, color: parseFloat(total) <= 0 ? '#10B981' : 'rgba(255,255,255,0.8)' }, { label: 'Average', value: avg }, { label: 'Low', value: Math.min(...vals).toFixed(1) }, { label: 'High', value: Math.max(...vals).toFixed(1) }].map(s => (
+                {[
+                  { label: 'Change', value: `${parseFloat(total) > 0 ? '+' : ''}${total}`, color: parseFloat(total) <= 0 ? '#10B981' : 'rgba(255,255,255,0.8)' },
+                  { label: 'Average', value: avg },
+                  { label: 'Low', value: Math.min(...vals).toFixed(1) },
+                  { label: 'High', value: Math.max(...vals).toFixed(1) },
+                ].map(s => (
                   <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '8px', textAlign: 'center' }}>
                     <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '3px' }}>{s.label}</p>
                     <p style={{ fontSize: '14px', fontWeight: '600', color: s.color || '#fff' }}>{s.value}</p>
@@ -503,8 +464,8 @@ function BodyWeightSection() {
   )
 }
 
-// ── Exercise row ─────────────────────────────────────────────────────────────
-function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, dragHandleProps, onStartRest }) {
+// ── Exercise Row ──────────────────────────────────────────────────────────────
+function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, onStartRest, dragHandleProps }) {
   const [expanded, setExpanded] = useState(false)
   const [variantsOpen, setVariantsOpen] = useState(false)
 
@@ -524,14 +485,11 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
     <div style={{ borderRadius: isVariant ? '14px' : '18px', background: exLog.done ? 'rgba(16,185,129,0.08)' : isVariant ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)', border: `1px solid ${exLog.done ? 'rgba(16,185,129,0.25)' : isVariant ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.15)'}`, overflow: 'hidden', transition: 'background 0.2s, border 0.2s' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: isVariant ? '11px 14px' : '14px 16px' }}>
-        {!isVariant && (
-  <div
-    {...dragHandleProps}
-    style={{ ...(dragHandleProps?.style || {}), cursor: 'grab', padding: '4px 6px', touchAction: 'none', userSelect: 'none' }}
-  >
-    <DragIcon />
-  </div>
-)}
+        {!isVariant && dragHandleProps && (
+          <div {...dragHandleProps}>
+            <DragIcon />
+          </div>
+        )}
         {isVariant && <div style={{ width: '2px', height: '28px', background: 'rgba(99,102,241,0.4)', borderRadius: '1px', flexShrink: 0 }} />}
 
         <div onClick={toggleDone} style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, cursor: 'pointer', background: exLog.done ? '#10B981' : 'rgba(255,255,255,0.1)', border: `2px solid ${exLog.done ? '#10B981' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -604,7 +562,6 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             </div>
           </div>
 
-          {/* Manual rest timer trigger */}
           <button onClick={() => onStartRest(ex.rest_seconds || 90)} style={{ width: '100%', padding: '8px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'rgba(199,200,255,0.8)', fontSize: '12px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             Start rest timer ({ex.rest_seconds || 90}s)
@@ -645,64 +602,49 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
   )
 }
 
-// ── Sortable list ────────────────────────────────────────────────────────────
-function SortableExerciseList({ exercises, progId, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, onReorder, onStartRest }) {
+// ── Sortable Exercise List (iOS touch + desktop drag) ─────────────────────────
+function SortableExerciseList({ exercises, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, onReorder, onStartRest }) {
   const [items, setItems] = useState(exercises)
   const [draggingIdx, setDraggingIdx] = useState(null)
-  const [overIdx, setOverIdx] = useState(null)
   const listRef = useRef(null)
-  const touchDragIdx = useRef(null)
   const itemRefs = useRef([])
+  const touchDragIdx = useRef(null)
 
   useEffect(() => { setItems(exercises) }, [exercises])
 
-  // ── Desktop drag ──────────────────────────────────────────────────────────
-  const handleDragStart = (e, i) => {
-    setDraggingIdx(i)
-    e.dataTransfer.effectAllowed = 'move'
+  const saveOrder = async (ordered) => {
+    onReorder(ordered)
+    await Promise.all(ordered.map((ex, idx) =>
+      supabase.from('exercises').update({ sort_order: idx }).eq('id', ex.id)
+    ))
   }
 
-  const handleDragEnter = (i) => {
+  // Desktop drag
+  const onDragStart = (e, i) => { setDraggingIdx(i); e.dataTransfer.effectAllowed = 'move' }
+  const onDragEnter = (i) => {
     if (draggingIdx === null || draggingIdx === i) return
-    setOverIdx(i)
     const next = [...items]
     const [moved] = next.splice(draggingIdx, 1)
     next.splice(i, 0, moved)
     setDraggingIdx(i)
     setItems(next)
   }
+  const onDragEnd = () => { setDraggingIdx(null); saveOrder(items) }
 
-  const handleDragEnd = async () => {
-    setDraggingIdx(null)
-    setOverIdx(null)
-    onReorder(items)
-    await Promise.all(items.map((ex, idx) =>
-      supabase.from('exercises').update({ sort_order: idx }).eq('id', ex.id)
-    ))
-  }
-
-  // ── Touch drag (iOS) ──────────────────────────────────────────────────────
-  const handleTouchStart = (e, i) => {
+  // iOS touch drag
+  const onTouchStart = (e, i) => {
     touchDragIdx.current = i
     setDraggingIdx(i)
   }
-
-  const handleTouchMove = (e) => {
+  const onTouchMove = (e) => {
     if (touchDragIdx.current === null) return
     const touch = e.touches[0]
-    const list = listRef.current
-    if (!list) return
-
-    // Find which item we're hovering over
     let targetIdx = null
     itemRefs.current.forEach((el, idx) => {
       if (!el) return
       const rect = el.getBoundingClientRect()
-      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
-        targetIdx = idx
-      }
+      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) targetIdx = idx
     })
-
     if (targetIdx !== null && targetIdx !== touchDragIdx.current) {
       const next = [...items]
       const [moved] = next.splice(touchDragIdx.current, 1)
@@ -712,15 +654,7 @@ function SortableExerciseList({ exercises, progId, todayLogs, lastWeekLogs, onEd
       setItems(next)
     }
   }
-
-  const handleTouchEnd = async () => {
-    setDraggingIdx(null)
-    touchDragIdx.current = null
-    onReorder(items)
-    await Promise.all(items.map((ex, idx) =>
-      supabase.from('exercises').update({ sort_order: idx }).eq('id', ex.id)
-    ))
-  }
+  const onTouchEnd = () => { setDraggingIdx(null); touchDragIdx.current = null; saveOrder(items) }
 
   return (
     <div ref={listRef} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -729,15 +663,11 @@ function SortableExerciseList({ exercises, progId, todayLogs, lastWeekLogs, onEd
           key={ex.id}
           ref={el => itemRefs.current[i] = el}
           draggable
-          onDragStart={e => handleDragStart(e, i)}
-          onDragEnter={() => handleDragEnter(i)}
-          onDragEnd={handleDragEnd}
+          onDragStart={e => onDragStart(e, i)}
+          onDragEnter={() => onDragEnter(i)}
+          onDragEnd={onDragEnd}
           onDragOver={e => e.preventDefault()}
-          style={{
-            opacity: draggingIdx === i ? 0.4 : 1,
-            transform: draggingIdx === i ? 'scale(0.98)' : 'scale(1)',
-            transition: 'opacity 0.15s, transform 0.15s',
-          }}
+          style={{ opacity: draggingIdx === i ? 0.4 : 1, transition: 'opacity 0.15s' }}
         >
           <ExerciseRow
             ex={ex}
@@ -751,10 +681,10 @@ function SortableExerciseList({ exercises, progId, todayLogs, lastWeekLogs, onEd
             chartData={chartData[ex.id]}
             onStartRest={onStartRest}
             dragHandleProps={{
-              onTouchStart: e => handleTouchStart(e, i),
-              onTouchMove: handleTouchMove,
-              onTouchEnd: handleTouchEnd,
-              style: { cursor: 'grab', padding: '4px 2px', touchAction: 'none', userSelect: 'none' }
+              onTouchStart: e => onTouchStart(e, i),
+              onTouchMove: onTouchMove,
+              onTouchEnd: onTouchEnd,
+              style: { cursor: 'grab', padding: '4px 6px', touchAction: 'none', userSelect: 'none', flexShrink: 0 }
             }}
           />
         </div>
@@ -763,40 +693,7 @@ function SortableExerciseList({ exercises, progId, todayLogs, lastWeekLogs, onEd
   )
 }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      {items.map((ex, i) => (
-        <div
-          key={ex.id}
-          draggable
-          onDragStart={e => handleDragStart(e, i)}
-          onDragEnter={() => handleDragEnter(i)}
-          onDragEnd={handleDragEnd}
-          onDragOver={e => e.preventDefault()}
-          style={{ opacity: draggingId === ex.id ? 0.4 : 1, transition: 'opacity 0.15s' }}
-        >
-          <ExerciseRow
-            ex={ex}
-            todayLogs={todayLogs}
-            lastWeekLogs={lastWeekLogs}
-            onEdit={onEdit}
-            onAddVariant={onAddVariant}
-            allCharts={allCharts}
-            setAllCharts={setAllCharts}
-            onLogChange={onLogChange}
-            chartData={chartData[ex.id]}
-            onStartRest={onStartRest}
-            dragHandleProps={{
-              onMouseDown: () => {},
-            }}
-          />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ── Main ─────────────────────────────────────────────────────────────────────
+// ── Main Workout Component ────────────────────────────────────────────────────
 export default function Workout({ workoutActive, workoutElapsed, workoutRunning, onStartWorkout, onStopWorkout, onToggleTimer }) {
   const [programs, setPrograms] = useState([])
   const [todayLogs, setTodayLogs] = useState({})
@@ -806,7 +703,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   const [loading, setLoading] = useState(true)
   const [allCharts, setAllCharts] = useState(null)
   const [activeTab, setActiveTab] = useState('workout')
-  const [restTimer, setRestTimer] = useState(null) // { secs, key }
+  const [restTimer, setRestTimer] = useState(null)
   const [showAddProg, setShowAddProg] = useState(false)
   const [showExModal, setShowExModal] = useState(false)
   const [editingProg, setEditingProg] = useState(null)
@@ -829,11 +726,16 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
       const { data: lwLogs } = await supabase.from('workout_logs').select('*').eq('logged_date', lastWeek)
       const { data: allLogs } = await supabase.from('workout_logs').select('*').order('logged_date')
 
-      const exerciseMap = {}; const topLevel = []
+      const exerciseMap = {}
+      const topLevel = []
       exs?.forEach(e => { exerciseMap[e.id] = { ...e, variants: [] } })
-      exs?.forEach(e => { if (e.parent_id) { if (exerciseMap[e.parent_id]) exerciseMap[e.parent_id].variants.push(exerciseMap[e.id]) } else topLevel.push(exerciseMap[e.id]) })
+      exs?.forEach(e => {
+        if (e.parent_id) { if (exerciseMap[e.parent_id]) exerciseMap[e.parent_id].variants.push(exerciseMap[e.id]) }
+        else topLevel.push(exerciseMap[e.id])
+      })
 
       setPrograms(progs?.map(p => ({ ...p, exercises: topLevel.filter(e => e.program_id === p.id) })) || [])
+
       const tMap = {}; tLogs?.forEach(l => { tMap[l.exercise_id] = l }); setTodayLogs(tMap)
       const lwMap = {}; lwLogs?.forEach(l => { lwMap[l.exercise_id] = l }); setLastWeekLogs(lwMap)
 
@@ -844,11 +746,12 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
         cMap[l.exercise_id].push({ label: new Date(l.logged_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: l.weight_used })
       })
       setChartData(cMap)
-    } catch (e) { console.error(e) }
+    } catch(e) { console.error(e) }
     setLoading(false)
   }
 
   const prog = programs.find(p => p.id === selected)
+
   const donePct = (() => {
     if (!prog) return 0
     const allExIds = prog.exercises.flatMap(e => [e.id, ...(e.variants || []).map(v => v.id)])
@@ -876,7 +779,10 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
     else await supabase.from('programs').insert(progForm)
     setShowAddProg(false); loadAll()
   }
-  const deleteProg = async () => { await supabase.from('programs').delete().eq('id', editingProg.id); setSelected(null); setShowAddProg(false); loadAll() }
+  const deleteProg = async () => {
+    await supabase.from('programs').delete().eq('id', editingProg.id)
+    setSelected(null); setShowAddProg(false); loadAll()
+  }
 
   const openAddEx = () => { setEditingEx(null); setAddingVariantFor(null); setExForm({ name: '', sets: '', reps: '', weight: '', notes: '', rest_seconds: '90' }); setShowExModal(true) }
   const openEditEx = (e, ex) => {
@@ -885,6 +791,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
     setShowExModal(true)
   }
   const openAddVariant = (parentExId) => { setEditingEx(null); setAddingVariantFor(parentExId); setExForm({ name: '', sets: '', reps: '', weight: '', notes: '', rest_seconds: '90' }); setShowExModal(true) }
+
   const saveEx = async () => {
     if (!exForm.name.trim()) return
     const built = { name: exForm.name, sets: parseInt(exForm.sets) || 1, reps: exForm.reps, weight: exForm.weight, notes: exForm.notes, rest_seconds: parseInt(exForm.rest_seconds) || 90 }
@@ -893,8 +800,25 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
     else await supabase.from('exercises').insert({ ...built, program_id: selected })
     setShowExModal(false); loadAll()
   }
-  const deleteEx = async () => { await supabase.from('exercises').delete().eq('id', editingEx.id); setShowExModal(false); loadAll() }
-  const handleReorder = (newOrder) => setPrograms(ps => ps.map(p => p.id === selected ? { ...p, exercises: newOrder } : p))
+
+  const deleteEx = async () => {
+    await supabase.from('exercises').delete().eq('id', editingEx.id)
+    setShowExModal(false); loadAll()
+  }
+
+  const handleReorder = (newOrder) => {
+    setPrograms(ps => ps.map(p => p.id === selected ? { ...p, exercises: newOrder } : p))
+  }
+
+  const selectProgram = (id) => {
+    if (id === selected) {
+      setSelected(null)
+      onStopWorkout()
+    } else {
+      setSelected(id)
+      onStartWorkout()
+    }
+  }
 
   if (loading) return (
     <div style={{ padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px' }}>
@@ -921,7 +845,6 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
         )}
       </div>
 
-      {/* Tab switcher */}
       <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '16px', padding: '4px' }}>
         {[{ id: 'workout', label: 'Training', icon: <DumbbellIcon /> }, { id: 'weight', label: 'Body Weight', icon: <ScaleIcon /> }].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', borderRadius: '12px', cursor: 'pointer', background: activeTab === t.id ? 'rgba(99,102,241,0.4)' : 'transparent', border: `1px solid ${activeTab === t.id ? 'rgba(99,102,241,0.5)' : 'transparent'}`, color: activeTab === t.id ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '500', fontFamily: 'Inter, sans-serif', transition: 'all 0.2s' }}>
@@ -936,16 +859,8 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {programs.map(p => (
-              <button key={p.id} onClick={() => {
-  if (p.id === selected) {
-    setSelected(null)
-    onStopWorkout()
-  } else {
-    setSelected(p.id)
-    onStartWorkout()
-  }
-}} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '20px', cursor: 'pointer', background: selected === p.id ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.08)', border: `1px solid ${selected === p.id ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.15)'}`, fontFamily: 'Inter, sans-serif', textAlign: 'left', transition: 'all 0.2s', width: '100%' }}>
-  <div style={iconBg}>{p.tag === 'Cardio' ? <HeartIcon /> : <DumbbellIcon />}</div>
+              <button key={p.id} onClick={() => selectProgram(p.id)} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '20px', cursor: 'pointer', background: selected === p.id ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.08)', border: `1px solid ${selected === p.id ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.15)'}`, fontFamily: 'Inter, sans-serif', textAlign: 'left', transition: 'all 0.2s', width: '100%' }}>
+                <div style={iconBg}>{p.tag === 'Cardio' ? <HeartIcon /> : <DumbbellIcon />}</div>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: '15px', fontWeight: '600', color: '#fff' }}>{p.name}</p>
                   <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{p.exercises?.length || 0} exercises · {p.tag}</p>
@@ -960,13 +875,13 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
           {selected && prog && (
             <>
               {workoutActive && (
-  <WorkoutTimer
-    elapsed={workoutElapsed}
-    running={workoutRunning}
-    onToggle={onToggleTimer}
-    onStop={() => { onStopWorkout(); setSelected(null) }}
-  />
-)}
+                <WorkoutTimer
+                  elapsed={workoutElapsed}
+                  running={workoutRunning}
+                  onToggle={onToggleTimer}
+                  onStop={() => { onStopWorkout(); setSelected(null) }}
+                />
+              )}
 
               <div style={{ ...glass, padding: '18px 20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -979,12 +894,17 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
               </div>
 
               <SortableExerciseList
-                exercises={prog.exercises} progId={selected}
-                todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
-                onEdit={openEditEx} onAddVariant={openAddVariant}
-                allCharts={allCharts} setAllCharts={setAllCharts}
-                onLogChange={handleLogChange} chartData={chartData}
-                onReorder={handleReorder} onStartRest={startRest}
+                exercises={prog.exercises}
+                todayLogs={todayLogs}
+                lastWeekLogs={lastWeekLogs}
+                onEdit={openEditEx}
+                onAddVariant={openAddVariant}
+                allCharts={allCharts}
+                setAllCharts={setAllCharts}
+                onLogChange={handleLogChange}
+                chartData={chartData}
+                onReorder={handleReorder}
+                onStartRest={startRest}
               />
 
               <button onClick={openAddEx} style={{ padding: '14px', borderRadius: '18px', cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.4)', fontSize: '14px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -1003,7 +923,6 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
         </>
       )}
 
-      {/* Rest timer overlay */}
       {restTimer && <RestTimer key={restTimer.key} restSeconds={restTimer.secs} onDismiss={() => setRestTimer(null)} />}
 
       {showAddProg && (
@@ -1013,7 +932,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
             <div>
               <label style={labelStyle}>Type</label>
               <div style={{ display: 'flex', gap: '8px' }}>
-                {['Strength', 'Cardio', 'Mobility', 'Sport'].map(t => (
+                {['Strength','Cardio','Mobility','Sport'].map(t => (
                   <button key={t} onClick={() => setProgForm(f => ({ ...f, tag: t }))} style={{ flex: 1, padding: '8px', borderRadius: '12px', cursor: 'pointer', background: progForm.tag === t ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)', border: `1px solid ${progForm.tag === t ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.15)'}`, color: progForm.tag === t ? '#fff' : 'rgba(255,255,255,0.6)', fontSize: '12px', fontFamily: 'Inter, sans-serif' }}>{t}</button>
                 ))}
               </div>
@@ -1035,12 +954,12 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
             </div>
             <div>
               <label style={labelStyle}>Rest time (seconds)</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {[60, 90, 120, 180].map(s => (
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                {[60,90,120,180].map(s => (
                   <button key={s} onClick={() => setExForm(f => ({ ...f, rest_seconds: String(s) }))} style={{ flex: 1, padding: '8px', borderRadius: '12px', cursor: 'pointer', background: exForm.rest_seconds === String(s) ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)', border: `1px solid ${exForm.rest_seconds === String(s) ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.15)'}`, color: exForm.rest_seconds === String(s) ? '#fff' : 'rgba(255,255,255,0.6)', fontSize: '12px', fontFamily: 'Inter, sans-serif' }}>{s}s</button>
                 ))}
               </div>
-              <input style={{ ...inputStyle, marginTop: '8px', fontSize: '16px' }} type="number" placeholder="Custom seconds" value={exForm.rest_seconds} onChange={e => setExForm(f => ({ ...f, rest_seconds: e.target.value }))} />
+              <input style={{ ...inputStyle, fontSize: '16px' }} type="number" placeholder="Custom seconds" value={exForm.rest_seconds} onChange={e => setExForm(f => ({ ...f, rest_seconds: e.target.value }))} />
             </div>
             <div>
               <label style={labelStyle}>Notes</label>
