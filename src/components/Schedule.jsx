@@ -384,10 +384,10 @@ export default function Schedule() {
         <Modal title={editing ? 'Edit block' : 'Add block'} onClose={() => setShowAdd(false)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div><label style={labelStyle}>Name</label><input style={inputStyle} placeholder="e.g. Morning run" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div><label style={labelStyle}>Time</label><input style={inputStyle} type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} /></div>
-              <div><label style={labelStyle}>Duration (min)</label><input style={inputStyle} type="number" placeholder="30" value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} /></div>
-            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+  <div><label style={labelStyle}>Time</label><input style={inputStyle} type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} /></div>
+  <div><label style={labelStyle}>Duration (min)</label><input style={inputStyle} type="number" placeholder="30" value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} /></div>
+</div>
             <div>
               <label style={labelStyle}>Category</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -418,10 +418,10 @@ export default function Schedule() {
         <Modal title={editingTemplateBlock ? 'Edit block' : 'Add block'} onClose={() => setShowTemplateBlockModal(false)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div><label style={labelStyle}>Name</label><input style={inputStyle} placeholder="e.g. Morning run" value={templateBlockForm.name} onChange={e => setTemplateBlockForm(f => ({ ...f, name: e.target.value }))} /></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div><label style={labelStyle}>Time</label><input style={inputStyle} type="time" value={templateBlockForm.time} onChange={e => setTemplateBlockForm(f => ({ ...f, time: e.target.value }))} /></div>
-              <div><label style={labelStyle}>Duration (min)</label><input style={inputStyle} type="number" placeholder="30" value={templateBlockForm.duration} onChange={e => setTemplateBlockForm(f => ({ ...f, duration: e.target.value }))} /></div>
-            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+  <div><label style={labelStyle}>Time</label><input style={inputStyle} type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} /></div>
+  <div><label style={labelStyle}>Duration (min)</label><input style={inputStyle} type="number" placeholder="30" value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} /></div>
+</div>
             <div>
               <label style={labelStyle}>Category</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
