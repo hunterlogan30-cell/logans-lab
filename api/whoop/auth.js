@@ -9,7 +9,7 @@ export default function handler(req, res) {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: 'read:recovery read:cycles read:sleep read:workout read:profile read:body_measurement',
+    scope: 'read:recovery read:cycles read:sleep read:workout read:profile read:body_measurement offline',
     state,
   });
 
