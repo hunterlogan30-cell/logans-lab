@@ -41,3 +41,5 @@ export default async function handler(req, res) {
       recovery = await recoveryRes.json();
     }
   }
+  res.json({ cycles, sleep, recovery });
+}
