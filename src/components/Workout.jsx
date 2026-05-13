@@ -84,37 +84,34 @@ const vibrate = (pattern = [200, 100, 200]) => {
 }
 
 // ── Workout timer ────────────────────────────────────────────────────────────
-function WorkoutTimer({ isActive }) {
-  const [elapsed, setElapsed] = useState(0)
-  const [running, setRunning] = useState(false)
-  const intervalRef = useRef(null)
-
-  useEffect(() => {
-  if (!isActive) { clearInterval(intervalRef.current); setRunning(false); setElapsed(0) }
-}, [isActive])
-
-  useEffect(() => {
-    if (running) {
-      intervalRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
-    } else {
-      clearInterval(intervalRef.current)
-    }
-    return () => clearInterval(intervalRef.current)
-  }, [running])
-
-  if (!isActive) return null
-
+function WorkoutTimer({ elapsed, running, onToggle, onStop }) {
   return (
     <div style={{ ...glass, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: running ? '#10B981' : 'rgba(255,255,255,0.3)', boxShadow: running ? '0 0 8px #10B981' : 'none', animation: running ? 'pulse 1.5s infinite' : 'none' }} />
+        <div style={{
+          width: '8px', height: '8px', borderRadius: '50%',
+          background: running ? '#10B981' : 'rgba(255,255,255,0.3)',
+          boxShadow: running ? '0 0 8px #10B981' : 'none',
+          animation: running ? 'pulse 1.5s infinite' : 'none'
+        }} />
         <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>Workout time</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span style={{ fontSize: '22px', fontWeight: '700', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(elapsed)}</span>
-        <button onClick={() => setRunning(r => !r)} style={{ padding: '6px 14px', borderRadius: '10px', cursor: 'pointer', background: running ? 'rgba(255,255,255,0.1)' : 'rgba(99,102,241,0.4)', border: `1px solid ${running ? 'rgba(255,255,255,0.2)' : 'rgba(99,102,241,0.5)'}`, color: '#fff', fontSize: '12px', fontFamily: 'Inter, sans-serif', fontWeight: '500' }}>
-          {running ? 'Pause' : 'Resume'}
+        <button onClick={onToggle} style={{
+          padding: '6px 14px', borderRadius: '10px', cursor: 'pointer',
+          background: running ? 'rgba(255,255,255,0.1)' : 'rgba(99,102,241,0.4)',
+          border: `1px solid ${running ? 'rgba(255,255,255,0.2)' : 'rgba(99,102,241,0.5)'}`,
+          color: '#fff', fontSize: '12px', fontFamily: 'Inter, sans-serif', fontWeight: '500'
+        }}>
+          {running ? 'Pause' : 'Start'}
         </button>
+        <button onClick={onStop} style={{
+          padding: '6px 10px', borderRadius: '10px', cursor: 'pointer',
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontFamily: 'Inter, sans-serif'
+        }}>End</button>
       </div>
       <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
     </div>
@@ -650,27 +647,63 @@ function SortableExerciseList({ exercises, progId, todayLogs, lastWeekLogs, onEd
   const [items, setItems] = useState(exercises)
   const dragIdx = useRef(null)
   const dragOverIdx = useRef(null)
+  const [draggingId, setDraggingId] = useState(null)
 
   useEffect(() => { setItems(exercises) }, [exercises])
 
-  const handleDragStart = (i) => { dragIdx.current = i }
-  const handleDragEnter = (i) => { dragOverIdx.current = i }
+  const handleDragStart = (e, i) => {
+    dragIdx.current = i
+    setDraggingId(items[i].id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragEnter = (i) => {
+    if (dragIdx.current === null || dragIdx.current === i) return
+    dragOverIdx.current = i
+    const next = [...items]
+    const [moved] = next.splice(dragIdx.current, 1)
+    next.splice(i, 0, moved)
+    dragIdx.current = i
+    setItems(next)
+  }
+
   const handleDragEnd = async () => {
-    const from = dragIdx.current; const to = dragOverIdx.current
-    if (from === null || to === null || from === to) { dragIdx.current = null; dragOverIdx.current = null; return }
-    const next = [...items]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved)
-    setItems(next); dragIdx.current = null; dragOverIdx.current = null; onReorder(next)
-    await Promise.all(next.map((ex, idx) => supabase.from('exercises').update({ sort_order: idx }).eq('id', ex.id)))
+    setDraggingId(null)
+    dragIdx.current = null
+    dragOverIdx.current = null
+    onReorder(items)
+    await Promise.all(items.map((ex, idx) =>
+      supabase.from('exercises').update({ sort_order: idx }).eq('id', ex.id)
+    ))
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {items.map((ex, i) => (
-        <div key={ex.id} draggable onDragStart={() => handleDragStart(i)} onDragEnter={() => handleDragEnter(i)} onDragEnd={handleDragEnd} onDragOver={e => e.preventDefault()}>
-          <ExerciseRow ex={ex} todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
-            onEdit={onEdit} onAddVariant={onAddVariant} allCharts={allCharts} setAllCharts={setAllCharts}
-            onLogChange={onLogChange} chartData={chartData[ex.id]} onStartRest={onStartRest}
-            dragHandleProps={{ style: { cursor: 'grab', padding: '4px 2px', touchAction: 'none' } }} />
+        <div
+          key={ex.id}
+          draggable
+          onDragStart={e => handleDragStart(e, i)}
+          onDragEnter={() => handleDragEnter(i)}
+          onDragEnd={handleDragEnd}
+          onDragOver={e => e.preventDefault()}
+          style={{ opacity: draggingId === ex.id ? 0.4 : 1, transition: 'opacity 0.15s' }}
+        >
+          <ExerciseRow
+            ex={ex}
+            todayLogs={todayLogs}
+            lastWeekLogs={lastWeekLogs}
+            onEdit={onEdit}
+            onAddVariant={onAddVariant}
+            allCharts={allCharts}
+            setAllCharts={setAllCharts}
+            onLogChange={onLogChange}
+            chartData={chartData[ex.id]}
+            onStartRest={onStartRest}
+            dragHandleProps={{
+              onMouseDown: () => {},
+            }}
+          />
         </div>
       ))}
     </div>
@@ -678,7 +711,7 @@ function SortableExerciseList({ exercises, progId, todayLogs, lastWeekLogs, onEd
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
-export default function Workout() {
+export default function Workout({ workoutActive, workoutElapsed, workoutRunning, onStartWorkout, onStopWorkout, onToggleTimer }) {
   const [programs, setPrograms] = useState([])
   const [todayLogs, setTodayLogs] = useState({})
   const [lastWeekLogs, setLastWeekLogs] = useState({})
@@ -817,7 +850,15 @@ export default function Workout() {
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {programs.map(p => (
-              <button key={p.id} onClick={() => setSelected(p.id === selected ? null : p.id)} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '20px', cursor: 'pointer', background: selected === p.id ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.08)', border: `1px solid ${selected === p.id ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.15)'}`, fontFamily: 'Inter, sans-serif', textAlign: 'left', transition: 'all 0.2s' }}>
+              <button key={p.id} onClick={() => {
+  if (p.id === selected) {
+    setSelected(null)
+    onStopWorkout()
+  } else {
+    setSelected(p.id)
+    onStartWorkout()
+  }
+}}
                 <div style={iconBg}>{p.tag === 'Cardio' ? <HeartIcon /> : <DumbbellIcon />}</div>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: '15px', fontWeight: '600', color: '#fff' }}>{p.name}</p>
@@ -832,7 +873,14 @@ export default function Workout() {
 
           {selected && prog && (
             <>
-              <WorkoutTimer isActive={!!selected} />
+              {workoutActive && (
+  <WorkoutTimer
+    elapsed={workoutElapsed}
+    running={workoutRunning}
+    onToggle={onToggleTimer}
+    onStop={() => { onStopWorkout(); setSelected(null) }}
+  />
+)}
 
               <div style={{ ...glass, padding: '18px 20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
