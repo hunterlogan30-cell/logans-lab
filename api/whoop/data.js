@@ -34,36 +34,27 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Not connected to Whoop' });
   }
 
-  const headers = { 
+  const headers = {
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json'
   };
 
   try {
-    const [recoveryRes, sleepRes, cycleRes] = await Promise.all([
-  fetch('https://api.prod.whoop.com/developer/v1/recovery?limit=1', { headers }),
-  fetch('https://api.prod.whoop.com/developer/v1/sleep?limit=1', { headers }),
-  fetch('https://api.prod.whoop.com/developer/v1/cycle?limit=7', { headers }),
-]);
+    const [sleepRes, cycleRes] = await Promise.all([
+      fetch('https://api.prod.whoop.com/developer/v2/activity/sleep?limit=1', { headers }),
+      fetch('https://api.prod.whoop.com/developer/v1/cycle?limit=7', { headers }),
+    ]);
 
-    // Log status codes to debug
-    console.log('recovery status:', recoveryRes.status);
-    console.log('sleep status:', sleepRes.status);
-    console.log('cycle status:', cycleRes.status);
-
-    const recoveryText = await recoveryRes.text();
     const sleepText = await sleepRes.text();
     const cycleText = await cycleRes.text();
 
-    console.log('recovery body:', recoveryText);
-    console.log('sleep body:', sleepText);
-    console.log('cycle body:', cycleText);
+    const sleep = JSON.parse(sleepText);
+    const cycles = JSON.parse(cycleText);
 
-    res.json({
-      recovery: JSON.parse(recoveryText),
-      sleep: JSON.parse(sleepText),
-      cycles: JSON.parse(cycleText),
-    });
+    // Recovery is embedded in cycles — extract from most recent cycle
+    const latestCycle = cycles.records?.[0];
+
+    res.json({ sleep, cycles, latestCycle });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
