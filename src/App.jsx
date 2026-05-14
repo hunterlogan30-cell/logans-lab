@@ -41,11 +41,28 @@ export default function App() {
     setWorkoutRunning(false)
   }
 
-  const stopWorkout = () => {
-    setWorkoutActive(false)
-    setWorkoutElapsed(0)
-    setWorkoutRunning(false)
+  const stopWorkout = async () => {
+  setWorkoutActive(false)
+  setWorkoutElapsed(0)
+  setWorkoutRunning(false)
+
+  // Auto-tick the Fitness block in today's schedule
+  const today = new Date().toISOString().split('T')[0]
+  const { createClient } = await import('@supabase/supabase-js')
+  const { supabase } = await import('./supabase')
+  const { data: fitnessBlocks } = await supabase
+    .from('schedule_blocks')
+    .select('*')
+    .eq('date', today)
+    .eq('tag', 'Fitness')
+    .eq('done', false)
+  if (fitnessBlocks?.length) {
+    await supabase
+      .from('schedule_blocks')
+      .update({ done: true })
+      .eq('id', fitnessBlocks[0].id)
   }
+}
 
   const toggleWorkoutTimer = () => setWorkoutRunning(r => !r)
 
