@@ -45,7 +45,6 @@ const fmtDur = (min) => {
 
 const today = new Date().toISOString().split('T')[0]
 const todayDow = new Date().getDay()
-
 const emptyBlockForm = { time: '', name: '', tag: 'Focus', duration: '' }
 
 export default function Schedule() {
@@ -55,6 +54,7 @@ export default function Schedule() {
   const [pattern, setPattern] = useState({})
   const [filter, setFilter] = useState('All')
   const [loading, setLoading] = useState(true)
+  const [selectedTodayTemplate, setSelectedTodayTemplate] = useState(null)
 
   // Today block modal
   const [showBlockModal, setShowBlockModal] = useState(false)
@@ -63,7 +63,7 @@ export default function Schedule() {
 
   // Template state
   const [expandedTemplateId, setExpandedTemplateId] = useState(null)
-  const [templateBlocks, setTemplateBlocks] = useState({}) // keyed by templateId
+  const [templateBlocks, setTemplateBlocks] = useState({})
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState(null)
   const [templateForm, setTemplateForm] = useState({ name: '' })
@@ -91,7 +91,7 @@ export default function Schedule() {
     setLoading(false)
   }
 
-  const loadTemplateBocks = async (templateId) => {
+  const loadTemplateBlocks = async (templateId) => {
     const { data } = await supabase
       .from('schedule_template_blocks')
       .select('*')
@@ -105,12 +105,12 @@ export default function Schedule() {
       setExpandedTemplateId(null)
     } else {
       setExpandedTemplateId(templateId)
-      loadTemplateBocks(templateId)
+      loadTemplateBlocks(templateId)
     }
   }
 
-  // Load template into today
   const loadTemplate = async (templateId) => {
+    setSelectedTodayTemplate(templateId)
     const { data: tblocks } = await supabase
       .from('schedule_template_blocks')
       .select('*')
@@ -126,7 +126,6 @@ export default function Schedule() {
     setView('today')
   }
 
-  // Toggle today block done
   const toggle = async (id) => {
     const block = blocks.find(b => b.id === id)
     if (!block) return
@@ -135,7 +134,6 @@ export default function Schedule() {
     await supabase.from('schedule_blocks').update({ done: newDone }).eq('id', id)
   }
 
-  // Today block CRUD
   const openAddBlock = () => { setEditingBlock(null); setBlockForm(emptyBlockForm); setShowBlockModal(true) }
   const openEditBlock = (e, b) => { e.stopPropagation(); setEditingBlock(b); setBlockForm({ time: b.time, name: b.name, tag: b.tag, duration: b.duration }); setShowBlockModal(true) }
 
@@ -161,7 +159,6 @@ export default function Schedule() {
     loadAll()
   }
 
-  // Template CRUD
   const openAddTemplate = () => { setEditingTemplate(null); setTemplateForm({ name: '' }); setShowTemplateModal(true) }
   const openEditTemplate = (e, t) => { e.stopPropagation(); setEditingTemplate(t); setTemplateForm({ name: t.name }); setShowTemplateModal(true) }
 
@@ -183,7 +180,6 @@ export default function Schedule() {
     loadAll()
   }
 
-  // Template block CRUD
   const openAddTplBlock = (templateId) => {
     setTplBlockTemplateId(templateId)
     setEditingTplBlock(null)
@@ -206,16 +202,15 @@ export default function Schedule() {
       await supabase.from('schedule_template_blocks').insert({ ...tplBlockForm, template_id: tplBlockTemplateId })
     }
     setShowTplBlockModal(false)
-    loadTemplateBocks(tplBlockTemplateId)
+    loadTemplateBlocks(tplBlockTemplateId)
   }
 
   const deleteTplBlock = async () => {
     await supabase.from('schedule_template_blocks').delete().eq('id', editingTplBlock.id)
     setShowTplBlockModal(false)
-    loadTemplateBocks(tplBlockTemplateId)
+    loadTemplateBlocks(tplBlockTemplateId)
   }
 
-  // Weekly pattern
   const setPatternDay = async (dow, templateId) => {
     setPattern(p => ({ ...p, [dow]: templateId }))
     await supabase.from('schedule_weekly_pattern').upsert({ day_of_week: dow, template_id: templateId || null })
@@ -270,12 +265,20 @@ export default function Schedule() {
               <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '500' }}>Load template</p>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {templates.map(t => (
-                  <button key={t.id} onClick={() => loadTemplate(t.id)} style={{ padding: '8px 16px', borderRadius: '12px', cursor: 'pointer', background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: '#fff', fontSize: '13px', fontWeight: '500', fontFamily: 'Inter, sans-serif' }}>{t.name}</button>
+                  <button key={t.id} onClick={() => loadTemplate(t.id)} style={{
+                    padding: '8px 16px', borderRadius: '12px', cursor: 'pointer',
+                    background: selectedTodayTemplate === t.id ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.15)',
+                    border: `1px solid ${selectedTodayTemplate === t.id ? 'rgba(99,102,241,0.8)' : 'rgba(99,102,241,0.3)'}`,
+                    color: '#fff', fontSize: '13px', fontWeight: selectedTodayTemplate === t.id ? '600' : '500',
+                    fontFamily: 'Inter, sans-serif',
+                    boxShadow: selectedTodayTemplate === t.id ? '0 0 12px rgba(99,102,241,0.4)' : 'none',
+                  }}>{t.name}</button>
                 ))}
               </div>
             </div>
           )}
 
+          {/* Progress */}
           <div style={{ ...glass, padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
               <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>Daily progress</span>
@@ -293,12 +296,14 @@ export default function Schedule() {
             </div>
           </div>
 
+          {/* Filter */}
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
             {['All', ...TAGS].map(t => (
               <button key={t} onClick={() => setFilter(t)} style={{ flexShrink: 0, padding: '6px 14px', borderRadius: '20px', border: filter === t ? 'none' : '1px solid rgba(255,255,255,0.2)', background: filter === t ? '#fff' : 'rgba(255,255,255,0.08)', color: filter === t ? '#1a1a2e' : 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>{t}</button>
             ))}
           </div>
 
+          {/* Blocks */}
           {blocks.length === 0 ? (
             <div style={{ ...glass, padding: '32px', textAlign: 'center' }}>
               <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>No blocks for today.</p>
@@ -343,11 +348,9 @@ export default function Schedule() {
           ) : templates.map(t => (
             <div key={t.id} style={{ ...glass, padding: '16px 20px', border: `1px solid ${expandedTemplateId === t.id ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.2)'}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <button onClick={() => toggleExpanded(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', fontSize: '15px', fontWeight: '600', fontFamily: 'Inter, sans-serif', padding: 0, textAlign: 'left', flex: 1 }}>
+                <button onClick={() => toggleExpanded(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', fontSize: '15px', fontWeight: '600', fontFamily: 'Inter, sans-serif', padding: 0, textAlign: 'left', flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {t.name}
-                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginLeft: '8px' }}>
-                    {expandedTemplateId === t.id ? '▲' : '▼'}
-                  </span>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>{expandedTemplateId === t.id ? '▲' : '▼'}</span>
                 </button>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <button onClick={() => loadTemplate(t.id)} style={{ padding: '6px 14px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.3)', color: '#10B981', fontSize: '12px', fontFamily: 'Inter, sans-serif', fontWeight: '500' }}>Use today</button>
