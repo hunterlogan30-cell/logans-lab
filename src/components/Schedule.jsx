@@ -314,9 +314,16 @@ export default function Schedule() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {templates.map(t => (
-                <div key={t.id} style={{ ...glass, padding: '16px 20px' }}>
+               <div key={t.id} style={{ ...glass, padding: '16px 20px', border: `1px solid ${selectedTemplate?.id === t.id ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.2)'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: selectedTemplate?.id === t.id ? '14px' : '0' }}>
-                    <button onClick={() => { setSelectedTemplate(t); loadTemplateBlocks(t.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', fontSize: '15px', fontWeight: '600', fontFamily: 'Inter, sans-serif', padding: 0, textAlign: 'left' }}>{t.name}</button>
+                    <button onClick={() => {
+  if (selectedTemplate?.id === t.id) {
+    setSelectedTemplate(null)
+  } else {
+    setSelectedTemplate(t)
+    loadTemplateBlocks(t.id)
+  }
+}} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', fontSize: '15px', fontWeight: '600', fontFamily: 'Inter, sans-serif', padding: 0, textAlign: 'left' }}>{t.name}</button>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button onClick={() => loadTemplate(t.id)} style={{ padding: '6px 14px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.3)', color: '#10B981', fontSize: '12px', fontFamily: 'Inter, sans-serif', fontWeight: '500' }}>Use today</button>
                       <button onClick={() => openEditTemplate(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '4px' }}>
