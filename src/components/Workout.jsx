@@ -108,70 +108,53 @@ function WorkoutTimer({ elapsed, running, onToggle, onStop }) {
 
 // ── Rest Timer ────────────────────────────────────────────────────────────────
 function RestTimer({ restSeconds, onDismiss }) {
+  const endTimeRef = useRef(Date.now() + restSeconds * 1000)
   const [remaining, setRemaining] = useState(restSeconds)
   const [editTime, setEditTime] = useState(false)
   const [customSecs, setCustomSecs] = useState(restSeconds)
   const intervalRef = useRef(null)
   const hasAlerted = useRef(false)
 
+  const tick = () => {
+    const r = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000))
+    setRemaining(r)
+    if (r <= 0 && !hasAlerted.current) {
+      hasAlerted.current = true
+      clearInterval(intervalRef.current)
+      playBeep()
+      vibrate([300, 100, 300, 100, 300])
+    }
+  }
+
   useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setRemaining(r => {
-        if (r <= 1) {
-          clearInterval(intervalRef.current)
-          if (!hasAlerted.current) {
-            hasAlerted.current = true
-            playBeep()
-            vibrate([300,100,300,100,300])
-          }
-          return 0
-        }
-        return r - 1
-      })
-    }, 1000)
+    intervalRef.current = setInterval(tick, 500)
     return () => clearInterval(intervalRef.current)
   }, [])
+
+  // Recalculate when app comes back to foreground
+  useEffect(() => {
+    const handleVisibility = () => { if (!document.hidden) tick() }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
+
+  const addTime = (s) => {
+    endTimeRef.current = Math.max(Date.now(), endTimeRef.current) + s * 1000
+    hasAlerted.current = false
+    tick()
+  }
+
+  const applyCustom = () => {
+    const secs = parseInt(customSecs) || 60
+    endTimeRef.current = Date.now() + secs * 1000
+    hasAlerted.current = false
+    setEditTime(false)
+    tick()
+  }
 
   const pct = Math.max(0, remaining / restSeconds)
   const circumference = 2 * Math.PI * 28
   const isDone = remaining === 0
-
-  const applyCustom = () => {
-    clearInterval(intervalRef.current)
-    const secs = parseInt(customSecs) || 60
-    setRemaining(secs)
-    hasAlerted.current = false
-    setEditTime(false)
-    intervalRef.current = setInterval(() => {
-      setRemaining(r => {
-        if (r <= 1) {
-          clearInterval(intervalRef.current)
-          if (!hasAlerted.current) { hasAlerted.current = true; playBeep(); vibrate([300,100,300,100,300]) }
-          return 0
-        }
-        return r - 1
-      })
-    }, 1000)
-  }
-
-  const addTime = (s) => {
-    clearInterval(intervalRef.current)
-    const next = Math.max(0, remaining + s)
-    setRemaining(next)
-    if (next > 0) {
-      hasAlerted.current = false
-      intervalRef.current = setInterval(() => {
-        setRemaining(r => {
-          if (r <= 1) {
-            clearInterval(intervalRef.current)
-            if (!hasAlerted.current) { hasAlerted.current = true; playBeep(); vibrate([300,100,300,100,300]) }
-            return 0
-          }
-          return r - 1
-        })
-      }, 1000)
-    }
-  }
 
   return (
     <div style={{ position: 'fixed', bottom: '100px', left: '50%', transform: 'translateX(-50%)', width: 'calc(100% - 32px)', maxWidth: '414px', zIndex: 150, background: isDone ? 'rgba(16,185,129,0.95)' : 'rgba(18,27,46,0.97)', border: `1px solid ${isDone ? 'rgba(16,185,129,0.5)' : 'rgba(99,102,241,0.4)'}`, borderRadius: '24px', padding: '16px 20px', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
@@ -196,7 +179,7 @@ function RestTimer({ restSeconds, onDismiss }) {
                 <circle cx="36" cy="36" r="28" fill="none" stroke={remaining < 10 ? '#EF4444' : '#6366F1'} strokeWidth="5"
                   strokeDasharray={`${circumference * pct} ${circumference}`}
                   strokeLinecap="round" transform="rotate(-90 36 36)"
-                  style={{ transition: 'stroke-dasharray 0.9s linear, stroke 0.3s' }}
+                  style={{ transition: 'stroke-dasharray 0.4s linear, stroke 0.3s' }}
                 />
               </svg>
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -205,7 +188,7 @@ function RestTimer({ restSeconds, onDismiss }) {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
-                {[-30,-15,+15,+30].map(s => (
+                {[-30, -15, +15, +30].map(s => (
                   <button key={s} onClick={() => addTime(s)} style={{ flex: 1, padding: '7px 0', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: '12px', fontFamily: 'Inter, sans-serif', fontWeight: '500' }}>
                     {s > 0 ? `+${s}s` : `${s}s`}
                   </button>
