@@ -128,19 +128,19 @@ export default function App() {
       style={{ minHeight: '100dvh' }}
     >
       {wide ? (
-        <div style={{ display: 'flex', minHeight: '100dvh' }}>
-          <BottomNav tab={tab} setTab={setTab} />
-          <div style={{
-  marginLeft: '220px',
-  flex: 1,
-  minHeight: '100dvh',
-  overflowY: 'auto',
-  width: 'calc(100vw - 220px)',
-  boxSizing: 'border-box',
-}}>
-            {tabContent}
-          </div>
-        </div>
+  <div style={{ display: 'flex', minHeight: '100dvh' }}>
+    <BottomNav tab={tab} setTab={setTab} />
+    <div style={{
+      position: 'fixed',
+      left: '220px',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      overflowY: 'auto',
+    }}>
+      {tabContent}
+    </div>
+  </div>
       ) : (
         <>
           {tabContent}
