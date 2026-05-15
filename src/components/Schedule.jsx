@@ -3,74 +3,17 @@ import { supabase } from '../supabase'
 import Modal from './Modal'
 import { inputStyle, labelStyle, btnPrimary, btnSecondary } from './Input'
 
-// ── Liquid Glass Design System ─────────────────────────────────────────────
-const liquidGlass = {
-  background: 'linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 100%)',
-  backdropFilter: 'blur(24px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-  border: '1px solid rgba(255,255,255,0.25)',
-  borderTop: '1px solid rgba(255,255,255,0.45)',
+const glass = {
+  background: 'rgba(255,255,255,0.1)',
+  border: '1px solid rgba(255,255,255,0.2)',
   borderRadius: '24px',
-  boxShadow: '0 8px 32px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.08)',
-}
-
-const liquidGlassCard = {
-  ...liquidGlass,
-  position: 'relative',
-  overflow: 'hidden',
-}
-
-const frostButton = {
-  background: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 100%)',
-  backdropFilter: 'blur(16px) saturate(160%)',
-  WebkitBackdropFilter: 'blur(16px) saturate(160%)',
-  border: '1px solid rgba(255,255,255,0.3)',
-  borderTop: '1px solid rgba(255,255,255,0.5)',
-  borderRadius: '14px',
-  boxShadow: '0 4px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.4)',
-  color: '#fff',
-  fontFamily: 'Inter, sans-serif',
-  cursor: 'pointer',
-  transition: 'all 0.2s ease',
-}
-
-const indigoFrostButton = {
-  ...frostButton,
-  background: 'linear-gradient(135deg, rgba(99,102,241,0.55) 0%, rgba(79,70,229,0.35) 100%)',
-  border: '1px solid rgba(99,102,241,0.5)',
-  borderTop: '1px solid rgba(149,152,255,0.6)',
-  boxShadow: '0 4px 16px rgba(99,102,241,0.25), inset 0 1px 0 rgba(149,152,255,0.5)',
-}
-
-const greenFrostButton = {
-  ...frostButton,
-  background: 'linear-gradient(135deg, rgba(16,185,129,0.45) 0%, rgba(5,150,105,0.25) 100%)',
-  border: '1px solid rgba(16,185,129,0.4)',
-  borderTop: '1px solid rgba(52,211,153,0.6)',
-  boxShadow: '0 4px 16px rgba(16,185,129,0.2), inset 0 1px 0 rgba(52,211,153,0.4)',
-  color: '#6EF0C4',
 }
 
 const iconBg = {
-  background: 'linear-gradient(135deg, rgba(99,102,241,0.7) 0%, rgba(79,70,229,0.5) 100%)',
-  backdropFilter: 'blur(8px)',
-  WebkitBackdropFilter: 'blur(8px)',
-  borderRadius: '14px',
-  width: '40px', height: '40px', flexShrink: 0,
+  background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+  borderRadius: '14px', width: '40px', height: '40px', flexShrink: 0,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  border: '1px solid rgba(149,152,255,0.4)',
-  borderTop: '1px solid rgba(149,152,255,0.6)',
-  boxShadow: '0 4px 12px rgba(99,102,241,0.3), inset 0 1px 0 rgba(255,255,255,0.3)',
 }
-
-// Shimmer overlay for glass cards
-const ShimmerOverlay = () => (
-  <div style={{
-    position: 'absolute', inset: 0, pointerEvents: 'none', borderRadius: 'inherit',
-    background: 'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%)',
-    zIndex: 1,
-  }} />
-)
 
 const TAGS = ['Energy', 'Spirit', 'Focus', 'Recovery', 'Fitness', 'Mind', 'Other']
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -113,16 +56,19 @@ export default function Schedule() {
   const [loading, setLoading] = useState(true)
   const [selectedTodayTemplate, setSelectedTodayTemplate] = useState(null)
 
+  // Today block modal
   const [showBlockModal, setShowBlockModal] = useState(false)
   const [editingBlock, setEditingBlock] = useState(null)
   const [blockForm, setBlockForm] = useState(emptyBlockForm)
 
+  // Template state
   const [expandedTemplateId, setExpandedTemplateId] = useState(null)
   const [templateBlocks, setTemplateBlocks] = useState({})
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState(null)
   const [templateForm, setTemplateForm] = useState({ name: '' })
 
+  // Template block modal
   const [showTplBlockModal, setShowTplBlockModal] = useState(false)
   const [editingTplBlock, setEditingTplBlock] = useState(null)
   const [tplBlockTemplateId, setTplBlockTemplateId] = useState(null)
@@ -146,7 +92,11 @@ export default function Schedule() {
   }
 
   const loadTemplateBlocks = async (templateId) => {
-    const { data } = await supabase.from('schedule_template_blocks').select('*').eq('template_id', templateId).order('time')
+    const { data } = await supabase
+      .from('schedule_template_blocks')
+      .select('*')
+      .eq('template_id', templateId)
+      .order('time')
     setTemplateBlocks(prev => ({ ...prev, [templateId]: data || [] }))
   }
 
@@ -161,10 +111,16 @@ export default function Schedule() {
 
   const loadTemplate = async (templateId) => {
     setSelectedTodayTemplate(templateId)
-    const { data: tblocks } = await supabase.from('schedule_template_blocks').select('*').eq('template_id', templateId).order('time')
+    const { data: tblocks } = await supabase
+      .from('schedule_template_blocks')
+      .select('*')
+      .eq('template_id', templateId)
+      .order('time')
     await supabase.from('schedule_blocks').delete().eq('date', today)
     if (tblocks?.length) {
-      await supabase.from('schedule_blocks').insert(tblocks.map(b => ({ date: today, time: b.time, name: b.name, tag: b.tag, duration: b.duration, done: false })))
+      await supabase.from('schedule_blocks').insert(
+        tblocks.map(b => ({ date: today, time: b.time, name: b.name, tag: b.tag, duration: b.duration, done: false }))
+      )
     }
     await loadAll()
     setView('today')
@@ -224,8 +180,19 @@ export default function Schedule() {
     loadAll()
   }
 
-  const openAddTplBlock = (templateId) => { setTplBlockTemplateId(templateId); setEditingTplBlock(null); setTplBlockForm(emptyBlockForm); setShowTplBlockModal(true) }
-  const openEditTplBlock = (templateId, b) => { setTplBlockTemplateId(templateId); setEditingTplBlock(b); setTplBlockForm({ time: b.time, name: b.name, tag: b.tag, duration: b.duration }); setShowTplBlockModal(true) }
+  const openAddTplBlock = (templateId) => {
+    setTplBlockTemplateId(templateId)
+    setEditingTplBlock(null)
+    setTplBlockForm(emptyBlockForm)
+    setShowTplBlockModal(true)
+  }
+
+  const openEditTplBlock = (templateId, b) => {
+    setTplBlockTemplateId(templateId)
+    setEditingTplBlock(b)
+    setTplBlockForm({ time: b.time, name: b.name, tag: b.tag, duration: b.duration })
+    setShowTplBlockModal(true)
+  }
 
   const saveTplBlock = async () => {
     if (!tplBlockForm.name.trim() || !tplBlockForm.time) return
@@ -262,39 +229,31 @@ export default function Schedule() {
 
   return (
     <div style={{ padding: '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <style>{`
-        .frost-btn:active { transform: scale(0.97); opacity: 0.85; }
-        .block-row:active { transform: scale(0.99); }
-      `}</style>
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: '700', letterSpacing: '-0.5px' }}>Schedule</h1>
-          <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', marginTop: '4px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: '700' }}>Schedule</h1>
+          <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginTop: '4px' }}>
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         </div>
-        {(view === 'today' || view === 'templates') && (
-          <button
-            className="frost-btn"
-            onClick={view === 'today' ? openAddBlock : openAddTemplate}
-            style={{ ...indigoFrostButton, width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
-          >
+        {view === 'today' && (
+          <button onClick={openAddBlock} style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #4F46E5)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        )}
+        {view === 'templates' && (
+          <button onClick={openAddTemplate} style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #4F46E5)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
         )}
       </div>
 
       {/* View switcher */}
-      <div style={{ ...liquidGlass, padding: '4px', display: 'flex', gap: '4px' }}>
+      <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '16px', padding: '4px' }}>
         {[{ id: 'today', label: 'Today' }, { id: 'templates', label: 'Templates' }, { id: 'pattern', label: 'Weekly' }].map(v => (
-          <button key={v.id} onClick={() => setView(v.id)} className="frost-btn" style={{
-            flex: 1, padding: '10px', borderRadius: '20px', cursor: 'pointer',
-            fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: '500',
-            transition: 'all 0.2s',
-            ...(view === v.id ? indigoFrostButton : { background: 'transparent', border: '1px solid transparent', color: 'rgba(255,255,255,0.45)', boxShadow: 'none' }),
-          }}>{v.label}</button>
+          <button key={v.id} onClick={() => setView(v.id)} style={{ flex: 1, padding: '10px', borderRadius: '12px', cursor: 'pointer', background: view === v.id ? 'rgba(99,102,241,0.4)' : 'transparent', border: `1px solid ${view === v.id ? 'rgba(99,102,241,0.5)' : 'transparent'}`, color: view === v.id ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '500', fontFamily: 'Inter, sans-serif' }}>{v.label}</button>
         ))}
       </div>
 
@@ -302,17 +261,17 @@ export default function Schedule() {
       {view === 'today' && (
         <>
           {templates.length > 0 && (
-            <div style={{ ...liquidGlassCard, padding: '16px 20px' }}>
-              <ShimmerOverlay />
-              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '600', position: 'relative', zIndex: 2 }}>Load template</p>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', position: 'relative', zIndex: 2 }}>
+            <div style={{ ...glass, padding: '16px 20px' }}>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '500' }}>Load template</p>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {templates.map(t => (
-                  <button key={t.id} onClick={() => loadTemplate(t.id)} className="frost-btn" style={{
-                    padding: '8px 18px', borderRadius: '20px', fontSize: '13px', fontWeight: '500',
-                    ...(selectedTodayTemplate === t.id
-                      ? { ...indigoFrostButton, fontWeight: '600' }
-                      : { ...frostButton, color: 'rgba(255,255,255,0.8)' }
-                    ),
+                  <button key={t.id} onClick={() => loadTemplate(t.id)} style={{
+                    padding: '8px 16px', borderRadius: '12px', cursor: 'pointer',
+                    background: selectedTodayTemplate === t.id ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.15)',
+                    border: `1px solid ${selectedTodayTemplate === t.id ? 'rgba(99,102,241,0.8)' : 'rgba(99,102,241,0.3)'}`,
+                    color: '#fff', fontSize: '13px', fontWeight: selectedTodayTemplate === t.id ? '600' : '500',
+                    fontFamily: 'Inter, sans-serif',
+                    boxShadow: selectedTodayTemplate === t.id ? '0 0 12px rgba(99,102,241,0.4)' : 'none',
                   }}>{t.name}</button>
                 ))}
               </div>
@@ -320,87 +279,56 @@ export default function Schedule() {
           )}
 
           {/* Progress */}
-          <div style={{ ...liquidGlassCard, padding: '20px' }}>
-            <ShimmerOverlay />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', position: 'relative', zIndex: 2 }}>
-              <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', fontWeight: '500' }}>Daily progress</span>
+          <div style={{ ...glass, padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>Daily progress</span>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <button onClick={resetDay} className="frost-btn" style={{ background: 'none', border: 'none', boxShadow: 'none', backdropFilter: 'none', WebkitBackdropFilter: 'none', cursor: 'pointer', fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontFamily: 'Inter, sans-serif' }}>Reset</button>
-                <span style={{ fontSize: '14px', fontWeight: '700' }}>{done}/{blocks.length}</span>
+                <button onClick={resetDay} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontFamily: 'Inter, sans-serif' }}>Reset</button>
+                <span style={{ fontSize: '14px', fontWeight: '600' }}>{done}/{blocks.length}</span>
               </div>
             </div>
-            <div style={{ height: '7px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden', position: 'relative', zIndex: 2, boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.2)' }}>
-              <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #6366F1, #10B981)', borderRadius: '4px', transition: 'width 0.5s cubic-bezier(0.4,0,0.2,1)', boxShadow: '0 0 10px rgba(99,102,241,0.5)' }} />
+            <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #6366F1, #10B981)', borderRadius: '3px', transition: 'width 0.4s' }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', position: 'relative', zIndex: 2 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
               <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{pct === 100 ? 'All done — great work.' : pct > 50 ? 'More than halfway.' : 'Keep going.'}</span>
-              <span style={{ fontSize: '12px', fontWeight: '700', color: '#10B981' }}>{pct}%</span>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: '#10B981' }}>{pct}%</span>
             </div>
           </div>
 
-          {/* Filter chips */}
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
+          {/* Filter */}
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
             {['All', ...TAGS].map(t => (
-              <button key={t} onClick={() => setFilter(t)} className="frost-btn" style={{
-                flexShrink: 0, padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '500',
-                ...(filter === t
-                  ? { background: 'rgba(255,255,255,0.95)', border: '1px solid rgba(255,255,255,0.9)', color: '#1a1a2e', boxShadow: '0 2px 8px rgba(0,0,0,0.2)', backdropFilter: 'none', WebkitBackdropFilter: 'none' }
-                  : { ...frostButton, color: 'rgba(255,255,255,0.65)', padding: '6px 14px', borderRadius: '20px' }
-                ),
-              }}>{t}</button>
+              <button key={t} onClick={() => setFilter(t)} style={{ flexShrink: 0, padding: '6px 14px', borderRadius: '20px', border: filter === t ? 'none' : '1px solid rgba(255,255,255,0.2)', background: filter === t ? '#fff' : 'rgba(255,255,255,0.08)', color: filter === t ? '#1a1a2e' : 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: '500', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>{t}</button>
             ))}
           </div>
 
           {/* Blocks */}
           {blocks.length === 0 ? (
-            <div style={{ ...liquidGlassCard, padding: '40px 32px', textAlign: 'center' }}>
-              <ShimmerOverlay />
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '15px', position: 'relative', zIndex: 2 }}>No blocks for today.</p>
-              <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '13px', marginTop: '6px', position: 'relative', zIndex: 2 }}>Load a template above or tap + to add blocks.</p>
+            <div style={{ ...glass, padding: '32px', textAlign: 'center' }}>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>No blocks for today.</p>
+              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', marginTop: '6px' }}>Load a template above or tap + to add blocks.</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filtered.map(b => (
-                <div key={b.id} className="block-row" style={{
-                  ...liquidGlassCard,
-                  display: 'flex', alignItems: 'center', gap: '12px',
-                  padding: '14px 16px',
-                  opacity: b.done ? 0.45 : 1,
-                  transition: 'all 0.25s ease',
-                  background: b.done
-                    ? 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)'
-                    : 'linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 100%)',
-                }}>
-                  <ShimmerOverlay />
-                  <div onClick={() => toggle(b.id)} style={{ ...iconBg, cursor: 'pointer', flexShrink: 0, position: 'relative', zIndex: 2 }}>
+                <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderRadius: '20px', background: b.done ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.1)', border: `1px solid ${b.done ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.2)'}`, opacity: b.done ? 0.5 : 1, transition: 'all 0.2s' }}>
+                  <div onClick={() => toggle(b.id)} style={{ ...iconBg, cursor: 'pointer', flexShrink: 0 }}>
                     <TagIcon tag={b.tag} />
                   </div>
-                  <div onClick={() => toggle(b.id)} style={{ flex: 1, minWidth: 0, cursor: 'pointer', position: 'relative', zIndex: 2 }}>
+                  <div onClick={() => toggle(b.id)} style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
                     <p style={{ fontSize: '14px', fontWeight: '500', textDecoration: b.done ? 'line-through' : 'none', color: b.done ? 'rgba(255,255,255,0.4)' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</p>
                     <div style={{ display: 'flex', gap: '6px', marginTop: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)' }}>{fmt(b.time)}</span>
-                      <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)' }}>·</span>
-                      <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)' }}>{fmtDur(b.duration)}</span>
-                      <span style={{
-                        fontSize: '10px', padding: '2px 8px', borderRadius: '20px', fontWeight: '600',
-                        background: 'rgba(99,102,241,0.2)', color: 'rgba(199,200,255,0.9)',
-                        border: '1px solid rgba(99,102,241,0.3)',
-                        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-                      }}>{b.tag}</span>
+                      <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{fmt(b.time)}</span>
+                      <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)' }}>·</span>
+                      <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{fmtDur(b.duration)}</span>
+                      <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: 'rgba(99,102,241,0.25)', color: 'rgba(199,200,255,0.9)', fontWeight: '500' }}>{b.tag}</span>
                     </div>
                   </div>
-                  <button onClick={(e) => openEditBlock(e, b)} className="frost-btn" style={{ ...frostButton, padding: '6px', borderRadius: '10px', color: 'rgba(255,255,255,0.4)', flexShrink: 0, position: 'relative', zIndex: 2 }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  <button onClick={(e) => openEditBlock(e, b)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   </button>
-                  <div onClick={() => toggle(b.id)} style={{
-                    width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0, cursor: 'pointer',
-                    position: 'relative', zIndex: 2, transition: 'all 0.2s',
-                    ...(b.done
-                      ? { background: 'linear-gradient(135deg, #10B981, #059669)', border: '1px solid rgba(52,211,153,0.6)', boxShadow: '0 0 12px rgba(16,185,129,0.5), inset 0 1px 0 rgba(255,255,255,0.3)' }
-                      : { ...frostButton, width: '26px', height: '26px', borderRadius: '50%', padding: 0 }
-                    ),
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
+                  <div onClick={() => toggle(b.id)} style={{ width: '24px', height: '24px', borderRadius: '50%', flexShrink: 0, cursor: 'pointer', background: b.done ? '#10B981' : 'rgba(255,255,255,0.1)', border: `2px solid ${b.done ? '#10B981' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
                     {b.done && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                   </div>
                 </div>
@@ -414,50 +342,47 @@ export default function Schedule() {
       {view === 'templates' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {templates.length === 0 ? (
-            <div style={{ ...liquidGlassCard, padding: '40px 32px', textAlign: 'center' }}>
-              <ShimmerOverlay />
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '15px', position: 'relative', zIndex: 2 }}>No templates yet — tap + to create one.</p>
+            <div style={{ ...glass, padding: '32px', textAlign: 'center' }}>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>No templates yet — tap + to create one.</p>
             </div>
           ) : templates.map(t => (
-            <div key={t.id} style={{ ...liquidGlassCard, padding: '16px 20px', border: `1px solid ${expandedTemplateId === t.id ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.25)'}`, borderTop: `1px solid ${expandedTemplateId === t.id ? 'rgba(149,152,255,0.7)' : 'rgba(255,255,255,0.45)'}` }}>
-              <ShimmerOverlay />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 2 }}>
+            <div key={t.id} style={{ ...glass, padding: '16px 20px', border: `1px solid ${expandedTemplateId === t.id ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.2)'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <button onClick={() => toggleExpanded(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', fontSize: '15px', fontWeight: '600', fontFamily: 'Inter, sans-serif', padding: 0, textAlign: 'left', flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {t.name}
-                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>{expandedTemplateId === t.id ? '▲' : '▼'}</span>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>{expandedTemplateId === t.id ? '▲' : '▼'}</span>
                 </button>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <button onClick={() => loadTemplate(t.id)} className="frost-btn" style={{ ...greenFrostButton, padding: '6px 14px', borderRadius: '10px', fontSize: '12px', fontWeight: '600' }}>Use today</button>
-                  <button onClick={(e) => openEditTemplate(e, t)} className="frost-btn" style={{ ...frostButton, padding: '6px', borderRadius: '10px', color: 'rgba(255,255,255,0.4)' }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  <button onClick={() => loadTemplate(t.id)} style={{ padding: '6px 14px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.3)', color: '#10B981', fontSize: '12px', fontFamily: 'Inter, sans-serif', fontWeight: '500' }}>Use today</button>
+                  <button onClick={(e) => openEditTemplate(e, t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '4px' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   </button>
                 </div>
               </div>
 
               {expandedTemplateId === t.id && (
-                <div style={{ marginTop: '14px', position: 'relative', zIndex: 2 }}>
+                <div style={{ marginTop: '14px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
                     {!templateBlocks[t.id] ? (
                       <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '12px 0' }}>Loading...</p>
                     ) : templateBlocks[t.id].length === 0 ? (
                       <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '12px 0' }}>No blocks yet — add some below.</p>
                     ) : templateBlocks[t.id].map(b => (
-                      <div key={b.id} onClick={() => openEditTplBlock(t.id, b)} style={{ ...liquidGlassCard, display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', cursor: 'pointer', borderRadius: '14px' }}>
-                        <ShimmerOverlay />
-                        <div style={{ ...iconBg, width: '32px', height: '32px', borderRadius: '10px', flexShrink: 0, position: 'relative', zIndex: 2 }}><TagIcon tag={b.tag} /></div>
-                        <div style={{ flex: 1, minWidth: 0, position: 'relative', zIndex: 2 }}>
+                      <div key={b.id} onClick={() => openEditTplBlock(t.id, b)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>
+                        <div style={{ ...iconBg, width: '32px', height: '32px', borderRadius: '10px', flexShrink: 0 }}><TagIcon tag={b.tag} /></div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ fontSize: '13px', fontWeight: '500', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</p>
                           <div style={{ display: 'flex', gap: '6px', marginTop: '2px', alignItems: 'center' }}>
-                            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)' }}>{fmt(b.time)}</span>
-                            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)' }}>·</span>
-                            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)' }}>{fmtDur(b.duration)}</span>
-                            <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '20px', background: 'rgba(99,102,241,0.2)', color: 'rgba(199,200,255,0.9)', border: '1px solid rgba(99,102,241,0.3)' }}>{b.tag}</span>
+                            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>{fmt(b.time)}</span>
+                            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)' }}>·</span>
+                            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>{fmtDur(b.duration)}</span>
+                            <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '20px', background: 'rgba(99,102,241,0.25)', color: 'rgba(199,200,255,0.9)' }}>{b.tag}</span>
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                  <button onClick={() => openAddTplBlock(t.id)} className="frost-btn" style={{ ...frostButton, width: '100%', padding: '10px', borderRadius: '14px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'rgba(255,255,255,0.6)', boxSizing: 'border-box', background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)', border: '1px dashed rgba(255,255,255,0.25)' }}>
+                  <button onClick={() => openAddTplBlock(t.id)} style={{ width: '100%', padding: '10px', borderRadius: '12px', cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     Add block to {t.name}
                   </button>
@@ -470,29 +395,22 @@ export default function Schedule() {
 
       {/* ── WEEKLY PATTERN ── */}
       {view === 'pattern' && (
-        <div style={{ ...liquidGlassCard, padding: '20px' }}>
-          <ShimmerOverlay />
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', marginBottom: '16px', position: 'relative', zIndex: 2 }}>Set which template runs on each day of the week.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', zIndex: 2 }}>
+        <div style={{ ...glass, padding: '20px' }}>
+          <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', marginBottom: '16px' }}>Set which template runs on each day of the week.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {DAYS.map((day, dow) => (
-              <div key={dow} style={{
-                display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderRadius: '16px',
-                ...(dow === todayDow
-                  ? { background: 'linear-gradient(135deg, rgba(99,102,241,0.25) 0%, rgba(79,70,229,0.12) 100%)', border: '1px solid rgba(99,102,241,0.4)', borderTop: '1px solid rgba(149,152,255,0.5)' }
-                  : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }
-                ),
-              }}>
-                <span style={{ fontSize: '13px', fontWeight: dow === todayDow ? '700' : '500', color: dow === todayDow ? '#fff' : 'rgba(255,255,255,0.5)', width: '32px', flexShrink: 0 }}>{day}</span>
+              <div key={dow} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderRadius: '14px', background: dow === todayDow ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${dow === todayDow ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.08)'}` }}>
+                <span style={{ fontSize: '13px', fontWeight: dow === todayDow ? '700' : '500', color: dow === todayDow ? '#fff' : 'rgba(255,255,255,0.6)', width: '32px', flexShrink: 0 }}>{day}</span>
                 <div style={{ flex: 1, display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  <button onClick={() => setPatternDay(dow, null)} className="frost-btn" style={{ ...(!pattern[dow] ? indigoFrostButton : frostButton), padding: '5px 12px', borderRadius: '10px', fontSize: '11px', color: !pattern[dow] ? '#fff' : 'rgba(255,255,255,0.4)' }}>None</button>
+                  <button onClick={() => setPatternDay(dow, null)} style={{ padding: '5px 12px', borderRadius: '10px', cursor: 'pointer', background: !pattern[dow] ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${!pattern[dow] ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)'}`, color: !pattern[dow] ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: '11px', fontFamily: 'Inter, sans-serif' }}>None</button>
                   {templates.map(t => (
-                    <button key={t.id} onClick={() => setPatternDay(dow, t.id)} className="frost-btn" style={{ ...(pattern[dow] === t.id ? indigoFrostButton : frostButton), padding: '5px 12px', borderRadius: '10px', fontSize: '11px', color: pattern[dow] === t.id ? '#fff' : 'rgba(255,255,255,0.4)' }}>{t.name}</button>
+                    <button key={t.id} onClick={() => setPatternDay(dow, t.id)} style={{ padding: '5px 12px', borderRadius: '10px', cursor: 'pointer', background: pattern[dow] === t.id ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.05)', border: `1px solid ${pattern[dow] === t.id ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.1)'}`, color: pattern[dow] === t.id ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: '11px', fontFamily: 'Inter, sans-serif' }}>{t.name}</button>
                   ))}
                 </div>
               </div>
             ))}
           </div>
-          <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', marginTop: '14px', textAlign: 'center', position: 'relative', zIndex: 2 }}>Weekly pattern auto-loads your template each morning.</p>
+          <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '14px', textAlign: 'center' }}>The weekly pattern auto-loads your template each morning.</p>
         </div>
       )}
 
@@ -507,7 +425,7 @@ export default function Schedule() {
               <label style={labelStyle}>Category</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 {TAGS.map(t => (
-                  <button key={t} onClick={() => setBlockForm(f => ({ ...f, tag: t }))} className="frost-btn" style={{ ...(blockForm.tag === t ? indigoFrostButton : frostButton), padding: '6px 14px', borderRadius: '20px', fontSize: '12px', color: blockForm.tag === t ? '#fff' : 'rgba(255,255,255,0.6)' }}>{t}</button>
+                  <button key={t} onClick={() => setBlockForm(f => ({ ...f, tag: t }))} style={{ padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', background: blockForm.tag === t ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)', border: `1px solid ${blockForm.tag === t ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.15)'}`, color: blockForm.tag === t ? '#fff' : 'rgba(255,255,255,0.6)', fontSize: '12px', fontFamily: 'Inter, sans-serif' }}>{t}</button>
                 ))}
               </div>
             </div>
@@ -539,7 +457,7 @@ export default function Schedule() {
               <label style={labelStyle}>Category</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 {TAGS.map(t => (
-                  <button key={t} onClick={() => setTplBlockForm(f => ({ ...f, tag: t }))} className="frost-btn" style={{ ...(tplBlockForm.tag === t ? indigoFrostButton : frostButton), padding: '6px 14px', borderRadius: '20px', fontSize: '12px', color: tplBlockForm.tag === t ? '#fff' : 'rgba(255,255,255,0.6)' }}>{t}</button>
+                  <button key={t} onClick={() => setTplBlockForm(f => ({ ...f, tag: t }))} style={{ padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', background: tplBlockForm.tag === t ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)', border: `1px solid ${tplBlockForm.tag === t ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.15)'}`, color: tplBlockForm.tag === t ? '#fff' : 'rgba(255,255,255,0.6)', fontSize: '12px', fontFamily: 'Inter, sans-serif' }}>{t}</button>
                 ))}
               </div>
             </div>
