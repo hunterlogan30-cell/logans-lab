@@ -1,4 +1,14 @@
+import { useEffect, useState } from 'react'
+
 export default function BottomNav({ tab, setTab }) {
+  const [wide, setWide] = useState(window.innerWidth >= 768)
+
+  useEffect(() => {
+    const handler = () => setWide(window.innerWidth >= 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
   const tabs = [
     { id: 'home', label: 'Home', icon: (active) => (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#fff' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -28,21 +38,61 @@ export default function BottomNav({ tab, setTab }) {
     )},
   ]
 
+  // ── Sidebar (iPad/Desktop) ──────────────────────────────────────────────
+  if (wide) {
+    return (
+      <nav style={{
+        position: 'fixed', left: 0, top: 0, bottom: 0, width: '220px',
+        background: 'rgba(255,255,255,0.07)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        borderRight: '1px solid rgba(255,255,255,0.12)',
+        display: 'flex', flexDirection: 'column',
+        padding: '32px 12px 24px',
+        zIndex: 100,
+        gap: '4px',
+      }}>
+        <div style={{ marginBottom: '32px', paddingLeft: '12px' }}>
+          <p style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.5px', color: '#fff' }}>Logan's Lab</p>
+          <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '2px' }}>Life OS</p>
+        </div>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            display: 'flex', alignItems: 'center', gap: '12px',
+            padding: '11px 14px', borderRadius: '14px', cursor: 'pointer',
+            background: tab === t.id ? 'rgba(255,255,255,0.14)' : 'transparent',
+            border: tab === t.id ? '1px solid rgba(255,255,255,0.18)' : '1px solid transparent',
+            color: tab === t.id ? '#fff' : 'rgba(255,255,255,0.5)',
+            fontSize: '14px', fontWeight: tab === t.id ? '600' : '400',
+            fontFamily: 'Inter, sans-serif',
+            textAlign: 'left', width: '100%',
+            transition: 'all 0.2s',
+            boxShadow: tab === t.id ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+          }}>
+            {t.icon(tab === t.id)}
+            {t.label}
+          </button>
+        ))}
+      </nav>
+    )
+  }
+
+  // ── Bottom Nav (Mobile) ────────────────────────────────────────────────
   return (
     <nav style={{
-  position: 'fixed', bottom: '16px',
-  left: '50%', transform: 'translateX(-50%)',
-  width: 'calc(100% - 32px)', maxWidth: '430px',
-  background: 'rgba(255,255,255,0.1)',
-  border: '1px solid rgba(255,255,255,0.2)',
-  borderRadius: '24px',
-  padding: '9px',
-  display: 'flex', gap: '4px',
-  zIndex: 100,
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  boxShadow: '0px 25px 50px -12px rgba(0,0,0,0.25)',
-}}>
+      position: 'fixed', bottom: '16px',
+      left: '50%', transform: 'translateX(-50%)',
+      width: 'calc(100% - 32px)', maxWidth: '430px',
+      background: 'rgba(255,255,255,0.1)',
+      border: '1px solid rgba(255,255,255,0.2)',
+      borderRadius: '24px',
+      padding: '9px',
+      display: 'flex', gap: '4px',
+      zIndex: 100,
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      boxShadow: '0px 25px 50px -12px rgba(0,0,0,0.25)',
+    }}>
       {tabs.map(t => (
         <button key={t.id} onClick={() => setTab(t.id)} style={{
           flex: 1,
