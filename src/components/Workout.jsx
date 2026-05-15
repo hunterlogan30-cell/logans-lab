@@ -803,7 +803,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   )
 
   return (
-    <div style={{ padding: wide ? '40px 40px 24px' : '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+  <div style={{ padding: window.innerWidth >= 1024 ? '40px 40px 24px' : window.innerWidth >= 768 ? '32px 24px 24px' : '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>

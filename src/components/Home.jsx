@@ -63,10 +63,10 @@ const metricIconBg = {
 }
 
 export default function Home() {
- const [wide, setWide] = useState(window.innerWidth >= 1024)
+const [wide, setWide] = useState(window.innerWidth >= 768)
 
   useEffect(() => {
-   const handler = () => setWide(window.innerWidth >= 1024)
+   const handler = () => setWide(window.innerWidth >= 768)
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
