@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const glass = {
   background: 'rgba(255,255,255,0.1)',
@@ -58,6 +58,134 @@ function getTips(score) {
   ]
 }
 
+// ── Sleep Performance Trend Chart ─────────────────────────────────────────────
+function SleepTrendChart({ data }) {
+  const canvasRef = useRef(null)
+  const containerRef = useRef(null)
+  const [tooltip, setTooltip] = useState(null)
+  const PAD = { L: 40, R: 12, T: 16, B: 28 }
+
+  const getPoints = (W, H) => {
+    const chartW = W - PAD.L - PAD.R
+    const chartH = H - PAD.T - PAD.B
+    const vals = data.map(d => d.perf)
+    const min = Math.max(0, Math.min(...vals) * 0.95)
+    const max = Math.min(100, Math.max(...vals) * 1.05)
+    return data.map((d, i) => ({
+      x: PAD.L + (i / Math.max(data.length - 1, 1)) * chartW,
+      y: PAD.T + chartH - ((d.perf - min) / (max - min || 1)) * chartH,
+      ...d, idx: i, min, max,
+    }))
+  }
+
+  const draw = (hiIdx = null) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
+    const ctx = canvas.getContext('2d')
+    const W = canvas.width / dpr
+    const H = canvas.height / dpr
+    const chartH = H - PAD.T - PAD.B
+    const pts = getPoints(W, H)
+    ctx.clearRect(0, 0, W, H)
+    if (pts.length < 2) return
+
+    const { min, max } = pts[0]
+
+    // Grid lines
+    ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'right'
+    ;[0, 0.5, 1].forEach(pct => {
+      const v = Math.round(min + pct * (max - min))
+      const y = PAD.T + chartH - pct * chartH
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillText(`${v}%`, PAD.L - 5, y + 4)
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3])
+      ctx.beginPath(); ctx.moveTo(PAD.L, y); ctx.lineTo(W - PAD.R, y); ctx.stroke(); ctx.setLineDash([])
+    })
+
+    // Gradient fill
+    const grad = ctx.createLinearGradient(0, PAD.T, 0, PAD.T + chartH)
+    grad.addColorStop(0, 'rgba(99,102,241,0.35)'); grad.addColorStop(1, 'rgba(99,102,241,0)')
+    ctx.beginPath(); ctx.moveTo(pts[0].x, PAD.T + chartH)
+    pts.forEach(p => ctx.lineTo(p.x, p.y))
+    ctx.lineTo(pts[pts.length - 1].x, PAD.T + chartH); ctx.closePath()
+    ctx.fillStyle = grad; ctx.fill()
+
+    // Line
+    ctx.beginPath(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round'
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y))
+    ctx.stroke()
+
+    // Day labels
+    ctx.textAlign = 'center'; ctx.font = '10px Inter, sans-serif'
+    pts.forEach(p => {
+      ctx.fillStyle = p.isToday ? '#fff' : 'rgba(255,255,255,0.4)'
+      ctx.fillText(p.day, p.x, PAD.T + chartH + 18)
+    })
+
+    // Dots
+    pts.forEach(p => {
+      const hi = p.idx === hiIdx
+      if (hi) { ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill() }
+      ctx.beginPath(); ctx.arc(p.x, p.y, hi || p.isToday ? 5 : 3, 0, Math.PI * 2)
+      ctx.fillStyle = hi || p.isToday ? '#fff' : 'rgba(255,255,255,0.6)'; ctx.fill()
+    })
+
+    // Dashed line on hover
+    if (hiIdx !== null && pts[hiIdx]) {
+      const p = pts[hiIdx]
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3])
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, PAD.T + chartH); ctx.stroke(); ctx.setLineDash([])
+    }
+  }
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
+    const cssW = canvas.offsetWidth || 340
+    canvas.width = cssW * dpr; canvas.height = 160 * dpr
+    canvas.style.width = cssW + 'px'; canvas.style.height = '160px'
+    canvas.getContext('2d').scale(dpr, dpr)
+    draw()
+  }, [data])
+
+  const handleInteraction = (clientX) => {
+    const canvas = canvasRef.current; const container = containerRef.current
+    if (!canvas || !container) return
+    const dpr = window.devicePixelRatio || 1
+    const rect = canvas.getBoundingClientRect()
+    const x = ((clientX - rect.left) / rect.width) * (canvas.width / dpr)
+    const pts = getPoints(canvas.width / dpr, canvas.height / dpr)
+    let closest = null, minDist = Infinity
+    pts.forEach(p => { const d = Math.abs(p.x - x); if (d < minDist) { minDist = d; closest = p } })
+    if (closest && minDist < 50) {
+      draw(closest.idx)
+      const pct = closest.x / (canvas.width / dpr)
+      setTooltip({ x: (rect.left - container.getBoundingClientRect().left) + pct * rect.width, perf: closest.perf, day: closest.day })
+    }
+  }
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      {tooltip && (
+        <div style={{ position: 'absolute', top: '-8px', left: tooltip.x, transform: 'translateX(-50%)', background: 'rgba(255,255,255,0.95)', color: '#1a1a2e', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', fontWeight: '600', fontFamily: 'Inter, sans-serif', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10 }}>
+          {tooltip.day}: {tooltip.perf}%
+          <div style={{ position: 'absolute', bottom: '-4px', left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '4px solid rgba(255,255,255,0.95)' }} />
+        </div>
+      )}
+      <canvas ref={canvasRef} style={{ width: '100%', cursor: 'crosshair', display: 'block' }}
+        onMouseMove={e => handleInteraction(e.clientX)}
+        onMouseLeave={() => { draw(); setTooltip(null) }}
+        onTouchStart={e => { e.preventDefault(); handleInteraction(e.touches[0].clientX) }}
+        onTouchMove={e => { e.preventDefault(); handleInteraction(e.touches[0].clientX) }}
+        onTouchEnd={() => { draw(); setTooltip(null) }}
+      />
+    </div>
+  )
+}
+
+// ── Main Recovery Component ───────────────────────────────────────────────────
 export default function Recovery({ whoopData }) {
   const [data, setData] = useState(whoopData || null)
   const [loading, setLoading] = useState(!whoopData)
@@ -98,22 +226,21 @@ export default function Recovery({ whoopData }) {
   const sleepHrs = msToHrs(totalSleepMs)
   const sleepPerf = sleepScore?.sleep_performance_percentage || 0
 
-  // Parse cycle data for HR
+  // Cycle data
   const cycles = data.cycles?.records || []
   const todayCycle = cycles[0]
   const avgHR = todayCycle?.score?.average_heart_rate || 0
 
-  // Sleep performance chart data — last 7 nights
+  // Sleep performance trend — last 7 nights, oldest to newest
   const sleepPerfData = [...sleepRecords]
     .filter(r => !r.nap && r.score?.sleep_performance_percentage)
     .reverse()
     .map(r => ({
-      day: ['S','M','T','W','T','F','S'][new Date(r.start).getDay()],
+      label: new Date(r.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      day: ['S', 'M', 'T', 'W', 'T', 'F', 'S'][new Date(r.start).getDay()],
       perf: r.score.sleep_performance_percentage,
       isToday: new Date(r.start).toDateString() === new Date().toDateString(),
     }))
-
-  const maxPerf = Math.max(...sleepPerfData.map(d => d.perf), 1)
 
   const whoopScore = sleepPerf
   const scoreColor = whoopScore >= 67 ? '#10B981' : whoopScore >= 34 ? '#F59E0B' : '#EF4444'
@@ -197,36 +324,12 @@ export default function Recovery({ whoopData }) {
         </div>
       </div>
 
-      {/* Sleep performance chart */}
-      {sleepPerfData.length > 0 && (
+      {/* Sleep performance trend */}
+      {sleepPerfData.length >= 2 && (
         <div style={{ ...glass, padding: '20px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>Sleep Performance This Week</h3>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '80px' }}>
-            {sleepPerfData.map((d, i) => {
-              const h = Math.round((d.perf / 100) * 80)
-              const barColor = d.perf >= 67 ? '#10B981' : d.perf >= 34 ? '#F59E0B' : '#EF4444'
-              return (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '9px', fontWeight: '600', color: d.isToday ? '#fff' : 'rgba(255,255,255,0.4)' }}>{d.perf}%</span>
-                  <div style={{
-                    width: '100%', height: `${h}px`, borderRadius: '6px',
-                    background: d.isToday ? barColor : `${barColor}66`,
-                    boxShadow: d.isToday ? `0 0 12px ${barColor}66` : 'none',
-                    transition: 'all 0.3s',
-                  }} />
-                  <span style={{ fontSize: '10px', color: d.isToday ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)', fontWeight: d.isToday ? '700' : '400' }}>{d.day}</span>
-                </div>
-              )
-            })}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '14px' }}>
-            {[{ color: '#10B981', label: 'Good (67%+)' }, { color: '#F59E0B', label: 'Ok (34–66%)' }, { color: '#EF4444', label: 'Low (<34%)' }].map(l => (
-              <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: l.color }} />
-                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>{l.label}</span>
-              </div>
-            ))}
-          </div>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>Sleep Performance Trend</h3>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>Last 7 nights</p>
+          <SleepTrendChart data={sleepPerfData} />
         </div>
       )}
 
