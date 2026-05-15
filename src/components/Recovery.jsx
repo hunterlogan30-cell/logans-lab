@@ -288,7 +288,7 @@ export default function Recovery({ whoopData }) {
       </div>
 
       {/* Sleep stages + trend side by side */}
-      <div style={{ display: 'grid', gridTemplateColumns: sleepPerfData.length >= 2 ? '1fr 1fr' : '1fr', gap: '12px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: sleepPerfData.length >= 2 && window.innerWidth >= 1024 ? '1fr 1fr' : '1fr', gap: '12px', alignItems: 'start' }}>
         <div style={{ ...glass, padding: '20px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Sleep Stages</h3>
           <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', gap: '2px', marginBottom: '16px' }}>
