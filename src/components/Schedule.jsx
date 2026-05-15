@@ -73,10 +73,10 @@ export default function Schedule() {
   const [editingTplBlock, setEditingTplBlock] = useState(null)
   const [tplBlockTemplateId, setTplBlockTemplateId] = useState(null)
   const [tplBlockForm, setTplBlockForm] = useState(emptyBlockForm)
-  const [wide, setWide] = useState(window.innerWidth >= 768)
+ const [wide, setWide] = useState(window.innerWidth >= 1024)
 
 useEffect(() => {
-  const handler = () => setWide(window.innerWidth >= 768)
+  const handler = () => setWide(window.innerWidth >= 1024)
   window.addEventListener('resize', handler)
   return () => window.removeEventListener('resize', handler)
 }, [])
@@ -262,7 +262,7 @@ useEffect(() => {
 
     {/* ── TODAY ── */}
     {view === 'today' && (
-      <div style={{ display: wide ? 'grid' : 'flex', gridTemplateColumns: wide ? '1fr 340px' : undefined, flexDirection: wide ? undefined : 'column', gap: '20px', alignItems: 'start' }}>
+     <div style={{ display: wide && window.innerWidth > 1024 ? 'grid' : 'flex', gridTemplateColumns: wide && window.innerWidth > 1024 ? '1fr 340px' : undefined, flexDirection: wide && window.innerWidth > 1024 ? undefined : 'column', gap: '20px', alignItems: 'start' }}>
 
         {/* Left — blocks */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0 }}>

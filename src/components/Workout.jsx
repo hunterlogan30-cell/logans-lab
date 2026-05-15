@@ -335,7 +335,7 @@ function ProgressChart({ data, unit = 'lbs' }) {
 
 // ── Body Weight Section ───────────────────────────────────────────────────────
 function BodyWeightSection() {
-  const [wide, setWide] = useState(window.innerWidth >= 768)
+ const [wide, setWide] = useState(window.innerWidth >= 1024)
   const [logs, setLogs] = useState([])
   const [todayLog, setTodayLog] = useState(null)
   const [weight, setWeight] = useState('')
@@ -345,7 +345,7 @@ function BodyWeightSection() {
   const today = new Date().toISOString().split('T')[0]
 
   useEffect(() => {
-    const handler = () => setWide(window.innerWidth >= 768)
+   const handler = () => setWide(window.innerWidth >= 1024)
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
