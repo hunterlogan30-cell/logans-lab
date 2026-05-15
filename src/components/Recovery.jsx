@@ -110,7 +110,10 @@ export default function Recovery() {
 
   // Weekly strain for chart
   const weekStrains = [...cycles].reverse().map(c => c.score?.strain || 0)
-  const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+ const weekDays = cycles.map(c => {
+  const d = new Date(c.start)
+  return ['S','M','T','W','T','F','S'][d.getDay()]
+})
   const maxStrain = Math.max(...weekStrains, 1)
 
   // Recovery score from sleep performance
@@ -204,7 +207,8 @@ export default function Recovery() {
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '64px' }}>
           {weekStrains.map((v, i) => {
             const h = Math.round((v / maxStrain) * 64)
-            const isToday = i === weekStrains.length - 1
+            const cycleDate = new Date(cycles[i]?.start)
+const isToday = cycleDate.toDateString() === new Date().toDateString()
             return (
               <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                 <div style={{
