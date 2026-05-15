@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import WeeklyChart from './WeeklyChart'
 
 const glass = {
@@ -28,11 +29,6 @@ const Icons = {
   moon: (color = 'white', size = 20) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-    </svg>
-  ),
-  heart: (color = 'white', size = 20) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
     </svg>
   ),
   trending: (color = '#10B981', size = 16) => (
@@ -67,6 +63,14 @@ const metricIconBg = {
 }
 
 export default function Home() {
+  const [wide, setWide] = useState(window.innerWidth >= 768)
+
+  useEffect(() => {
+    const handler = () => setWide(window.innerWidth >= 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
   const greeting = () => {
     const h = new Date().getHours()
     if (h < 12) return 'Good morning'
@@ -88,100 +92,147 @@ export default function Home() {
   ]
 
   return (
-    <div style={{ padding: '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ padding: wide ? '40px 0 24px' : '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
       {/* Header */}
       <div>
-        <h1 style={{ fontSize: '24px', fontWeight: '700', letterSpacing: '0.07px', lineHeight: '32px' }}>Logan's Lab</h1>
-        <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', letterSpacing: '-0.15px', marginTop: '4px' }}>
+        <h1 style={{ fontSize: wide ? '32px' : '24px', fontWeight: '700', letterSpacing: '-0.5px' }}>Logan's Lab</h1>
+        <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', marginTop: '4px' }}>
           {greeting()} — holistic well-being tracker.
         </p>
       </div>
 
-      {/* Overall Score Card */}
-      <div style={{ ...glass, padding: '25px 25px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', letterSpacing: '-0.15px', marginBottom: '4px' }}>Overall Score</p>
-            <p style={{ fontSize: '48px', fontWeight: '700', lineHeight: '48px', letterSpacing: '0.35px' }}>85</p>
-          </div>
-          <div style={{
-            background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-            borderRadius: '50%', width: '80px', height: '80px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0px 20px 25px -5px rgba(0,0,0,0.1)',
-          }}>
-            {Icons.activity('white', 36)}
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {Icons.trending()}
-          <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)', letterSpacing: '-0.15px' }}>+5% from yesterday</span>
-        </div>
-      </div>
+      {wide ? (
+        // ── Desktop / iPad layout ──────────────────────────────────────────
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' }}>
 
-      {/* Metric Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-        {metricCards.map(m => (
-          <div key={m.label} style={{
-            background: 'rgba(255,255,255,0.1)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            borderRadius: '16px',
-            padding: '17px',
-            boxShadow: '0px 20px 25px -5px rgba(0,0,0,0.1)',
-            height: '138px',
-            display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-          }}>
-            <div style={metricIconBg}>{m.icon}</div>
-            <div>
-              <p style={{ fontSize: '24px', fontWeight: '700', letterSpacing: '0.07px' }}>{m.value}</p>
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', marginTop: '2px' }}>{m.label}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+          {/* Left column */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-      {/* Weekly Trend */}
-      <div style={{ ...glass, padding: '21px 21px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: '600', letterSpacing: '-0.44px' }}>Weekly Trend</h3>
-        <WeeklyChart />
-      </div>
-
-      {/* Ask Agent */}
-      <div style={{
-        background: 'rgba(255,255,255,0.05)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: '16px',
-        padding: '12px 16px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        cursor: 'pointer',
-      }}>
-        <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.9)', letterSpacing: '-0.15px' }}>Ask Agent...</span>
-        {Icons.send()}
-      </div>
-
-      {/* Today at a Glance */}
-      <div style={{ ...glass, padding: '21px 21px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: '600', letterSpacing: '-0.44px' }}>Today at a Glance</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {quickStats.map(s => (
-            <div key={s.label} style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '16px',
-              padding: '12px 16px',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {s.icon}
-                <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.9)', letterSpacing: '-0.15px' }}>{s.label}</span>
+            {/* Overall Score */}
+            <div style={{ ...glass, padding: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '500' }}>Overall Score</p>
+                <p style={{ fontSize: '64px', fontWeight: '700', lineHeight: 1, letterSpacing: '-2px' }}>85</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px' }}>
+                  {Icons.trending()}
+                  <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>+5% from yesterday</span>
+                </div>
               </div>
-              <span style={{ fontSize: '16px', fontWeight: '600', letterSpacing: '-0.31px' }}>{s.value}</span>
+              <div style={{ background: 'linear-gradient(135deg, #10B981, #059669)', borderRadius: '50%', width: '96px', height: '96px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 20px 40px rgba(16,185,129,0.3)' }}>
+                {Icons.activity('white', 44)}
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
 
+            {/* Metric Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+              {metricCards.map(m => (
+                <div key={m.label} style={{ ...glass, padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '130px' }}>
+                  <div style={metricIconBg}>{m.icon}</div>
+                  <div>
+                    <p style={{ fontSize: '28px', fontWeight: '700' }}>{m.value}</p>
+                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginTop: '2px' }}>{m.label}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Ask Agent */}
+            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+              <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)' }}>Ask Agent...</span>
+              {Icons.send()}
+            </div>
+          </div>
+
+          {/* Right column */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+            {/* Weekly Trend */}
+            <div style={{ ...glass, padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Weekly Trend</h3>
+              <WeeklyChart />
+            </div>
+
+            {/* Today at a Glance */}
+            <div style={{ ...glass, padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Today at a Glance</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                {quickStats.map(s => (
+                  <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {s.icon}
+                      <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>{s.label}</span>
+                    </div>
+                    <span style={{ fontSize: '20px', fontWeight: '700' }}>{s.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      ) : (
+        // ── Mobile layout ──────────────────────────────────────────────────
+        <>
+          {/* Overall Score */}
+          <div style={{ ...glass, padding: '25px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>Overall Score</p>
+                <p style={{ fontSize: '48px', fontWeight: '700', lineHeight: 1 }}>85</p>
+              </div>
+              <div style={{ background: 'linear-gradient(135deg, #10B981, #059669)', borderRadius: '50%', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 20px 25px rgba(0,0,0,0.1)' }}>
+                {Icons.activity('white', 36)}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {Icons.trending()}
+              <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)' }}>+5% from yesterday</span>
+            </div>
+          </div>
+
+          {/* Metric Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+            {metricCards.map(m => (
+              <div key={m.label} style={{ ...glass, padding: '17px', height: '138px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={metricIconBg}>{m.icon}</div>
+                <div>
+                  <p style={{ fontSize: '24px', fontWeight: '700' }}>{m.value}</p>
+                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', marginTop: '2px' }}>{m.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Weekly Trend */}
+          <div style={{ ...glass, padding: '21px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '600' }}>Weekly Trend</h3>
+            <WeeklyChart />
+          </div>
+
+          {/* Ask Agent */}
+          <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+            <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.9)' }}>Ask Agent...</span>
+            {Icons.send()}
+          </div>
+
+          {/* Today at a Glance */}
+          <div style={{ ...glass, padding: '21px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '600' }}>Today at a Glance</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {quickStats.map(s => (
+                <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {s.icon}
+                    <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.9)' }}>{s.label}</span>
+                  </div>
+                  <span style={{ fontSize: '16px', fontWeight: '600' }}>{s.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
