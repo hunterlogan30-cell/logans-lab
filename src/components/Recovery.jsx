@@ -305,8 +305,34 @@ export default function Recovery({ whoopData }) {
         ))}
       </div>
 
-      {/* Sleep stages */}
-      <div style={{ ...glass, padding: '20px' }}>
+      {/* Sleep stages + trend side by side */}
+<div style={{ display: 'grid', gridTemplateColumns: sleepPerfData.length >= 2 ? '1fr 1fr' : '1fr', gap: '12px', alignItems: 'start' }}>
+  <div style={{ ...glass, padding: '20px' }}>
+    <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Sleep Stages</h3>
+    <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', gap: '2px', marginBottom: '16px' }}>
+      {sleepStages.map(s => (
+        <div key={s.label} style={{ flex: s.pct, background: s.color }} />
+      ))}
+    </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {sleepStages.map(s => (
+        <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+          <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>{s.label}</span>
+          <span style={{ fontSize: '13px', fontWeight: '600', marginLeft: 'auto' }}>{s.pct}%</span>
+        </div>
+      ))}
+    </div>
+  </div>
+
+  {sleepPerfData.length >= 2 && (
+    <div style={{ ...glass, padding: '20px' }}>
+      <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>Sleep Performance</h3>
+      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>Last 7 nights</p>
+      <SleepTrendChart data={sleepPerfData} />
+    </div>
+  )}
+</div>
         <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Sleep Stages</h3>
         <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', gap: '2px', marginBottom: '16px' }}>
           {sleepStages.map(s => (
@@ -324,9 +350,34 @@ export default function Recovery({ whoopData }) {
         </div>
       </div>
 
-      {/* Sleep performance trend */}
-      {sleepPerfData.length >= 2 && (
-        <div style={{ ...glass, padding: '20px' }}>
+      {/* Sleep stages + trend side by side */}
+<div style={{ display: 'grid', gridTemplateColumns: sleepPerfData.length >= 2 ? '1fr 1fr' : '1fr', gap: '12px', alignItems: 'start' }}>
+  <div style={{ ...glass, padding: '20px' }}>
+    <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Sleep Stages</h3>
+    <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', gap: '2px', marginBottom: '16px' }}>
+      {sleepStages.map(s => (
+        <div key={s.label} style={{ flex: s.pct, background: s.color }} />
+      ))}
+    </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {sleepStages.map(s => (
+        <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+          <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>{s.label}</span>
+          <span style={{ fontSize: '13px', fontWeight: '600', marginLeft: 'auto' }}>{s.pct}%</span>
+        </div>
+      ))}
+    </div>
+  </div>
+
+  {sleepPerfData.length >= 2 && (
+    <div style={{ ...glass, padding: '20px' }}>
+      <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>Sleep Performance</h3>
+      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>Last 7 nights</p>
+      <SleepTrendChart data={sleepPerfData} />
+    </div>
+  )}
+</div>
           <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>Sleep Performance Trend</h3>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>Last 7 nights</p>
           <SleepTrendChart data={sleepPerfData} />
