@@ -58,7 +58,6 @@ function getTips(score) {
   ]
 }
 
-// ── Sleep Performance Trend Chart ─────────────────────────────────────────────
 function SleepTrendChart({ data }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
@@ -89,10 +88,7 @@ function SleepTrendChart({ data }) {
     const pts = getPoints(W, H)
     ctx.clearRect(0, 0, W, H)
     if (pts.length < 2) return
-
     const { min, max } = pts[0]
-
-    // Grid lines
     ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'right'
     ;[0, 0.5, 1].forEach(pct => {
       const v = Math.round(min + pct * (max - min))
@@ -101,37 +97,27 @@ function SleepTrendChart({ data }) {
       ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3])
       ctx.beginPath(); ctx.moveTo(PAD.L, y); ctx.lineTo(W - PAD.R, y); ctx.stroke(); ctx.setLineDash([])
     })
-
-    // Gradient fill
     const grad = ctx.createLinearGradient(0, PAD.T, 0, PAD.T + chartH)
     grad.addColorStop(0, 'rgba(99,102,241,0.35)'); grad.addColorStop(1, 'rgba(99,102,241,0)')
     ctx.beginPath(); ctx.moveTo(pts[0].x, PAD.T + chartH)
     pts.forEach(p => ctx.lineTo(p.x, p.y))
     ctx.lineTo(pts[pts.length - 1].x, PAD.T + chartH); ctx.closePath()
     ctx.fillStyle = grad; ctx.fill()
-
-    // Line
     ctx.beginPath(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2
     ctx.lineJoin = 'round'; ctx.lineCap = 'round'
     pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y))
     ctx.stroke()
-
-    // Day labels
     ctx.textAlign = 'center'; ctx.font = '10px Inter, sans-serif'
     pts.forEach(p => {
       ctx.fillStyle = p.isToday ? '#fff' : 'rgba(255,255,255,0.4)'
       ctx.fillText(p.day, p.x, PAD.T + chartH + 18)
     })
-
-    // Dots
     pts.forEach(p => {
       const hi = p.idx === hiIdx
       if (hi) { ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill() }
       ctx.beginPath(); ctx.arc(p.x, p.y, hi || p.isToday ? 5 : 3, 0, Math.PI * 2)
       ctx.fillStyle = hi || p.isToday ? '#fff' : 'rgba(255,255,255,0.6)'; ctx.fill()
     })
-
-    // Dashed line on hover
     if (hiIdx !== null && pts[hiIdx]) {
       const p = pts[hiIdx]
       ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3])
@@ -185,7 +171,6 @@ function SleepTrendChart({ data }) {
   )
 }
 
-// ── Main Recovery Component ───────────────────────────────────────────────────
 export default function Recovery({ whoopData }) {
   const [data, setData] = useState(whoopData || null)
   const [loading, setLoading] = useState(!whoopData)
@@ -212,7 +197,6 @@ export default function Recovery({ whoopData }) {
     </div>
   )
 
-  // Parse today's sleep
   const sleepRecords = data.sleep?.records || []
   const sleep = sleepRecords[0]
   const sleepScore = sleep?.score
@@ -226,12 +210,10 @@ export default function Recovery({ whoopData }) {
   const sleepHrs = msToHrs(totalSleepMs)
   const sleepPerf = sleepScore?.sleep_performance_percentage || 0
 
-  // Cycle data
   const cycles = data.cycles?.records || []
   const todayCycle = cycles[0]
   const avgHR = todayCycle?.score?.average_heart_rate || 0
 
-  // Sleep performance trend — last 7 nights, oldest to newest
   const sleepPerfData = [...sleepRecords]
     .filter(r => !r.nap && r.score?.sleep_performance_percentage)
     .reverse()
@@ -306,83 +288,33 @@ export default function Recovery({ whoopData }) {
       </div>
 
       {/* Sleep stages + trend side by side */}
-<div style={{ display: 'grid', gridTemplateColumns: sleepPerfData.length >= 2 ? '1fr 1fr' : '1fr', gap: '12px', alignItems: 'start' }}>
-  <div style={{ ...glass, padding: '20px' }}>
-    <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Sleep Stages</h3>
-    <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', gap: '2px', marginBottom: '16px' }}>
-      {sleepStages.map(s => (
-        <div key={s.label} style={{ flex: s.pct, background: s.color }} />
-      ))}
-    </div>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      {sleepStages.map(s => (
-        <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-          <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>{s.label}</span>
-          <span style={{ fontSize: '13px', fontWeight: '600', marginLeft: 'auto' }}>{s.pct}%</span>
+      <div style={{ display: 'grid', gridTemplateColumns: sleepPerfData.length >= 2 ? '1fr 1fr' : '1fr', gap: '12px', alignItems: 'start' }}>
+        <div style={{ ...glass, padding: '20px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Sleep Stages</h3>
+          <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', gap: '2px', marginBottom: '16px' }}>
+            {sleepStages.map(s => (
+              <div key={s.label} style={{ flex: s.pct, background: s.color }} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {sleepStages.map(s => (
+              <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>{s.label}</span>
+                <span style={{ fontSize: '13px', fontWeight: '600', marginLeft: 'auto' }}>{s.pct}%</span>
+              </div>
+            ))}
+          </div>
         </div>
-      ))}
-    </div>
-  </div>
 
-  {sleepPerfData.length >= 2 && (
-    <div style={{ ...glass, padding: '20px' }}>
-      <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>Sleep Performance</h3>
-      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>Last 7 nights</p>
-      <SleepTrendChart data={sleepPerfData} />
-    </div>
-  )}
-</div>
-        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Sleep Stages</h3>
-        <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', gap: '2px', marginBottom: '16px' }}>
-          {sleepStages.map(s => (
-            <div key={s.label} style={{ flex: s.pct, background: s.color }} />
-          ))}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          {sleepStages.map(s => (
-            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-              <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>{s.label}</span>
-              <span style={{ fontSize: '13px', fontWeight: '600', marginLeft: 'auto' }}>{s.pct}%</span>
-            </div>
-          ))}
-        </div>
+        {sleepPerfData.length >= 2 && (
+          <div style={{ ...glass, padding: '20px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>Sleep Performance</h3>
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>Last 7 nights</p>
+            <SleepTrendChart data={sleepPerfData} />
+          </div>
+        )}
       </div>
-
-      {/* Sleep stages + trend side by side */}
-<div style={{ display: 'grid', gridTemplateColumns: sleepPerfData.length >= 2 ? '1fr 1fr' : '1fr', gap: '12px', alignItems: 'start' }}>
-  <div style={{ ...glass, padding: '20px' }}>
-    <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Sleep Stages</h3>
-    <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', gap: '2px', marginBottom: '16px' }}>
-      {sleepStages.map(s => (
-        <div key={s.label} style={{ flex: s.pct, background: s.color }} />
-      ))}
-    </div>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      {sleepStages.map(s => (
-        <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-          <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>{s.label}</span>
-          <span style={{ fontSize: '13px', fontWeight: '600', marginLeft: 'auto' }}>{s.pct}%</span>
-        </div>
-      ))}
-    </div>
-  </div>
-
-  {sleepPerfData.length >= 2 && (
-    <div style={{ ...glass, padding: '20px' }}>
-      <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>Sleep Performance</h3>
-      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>Last 7 nights</p>
-      <SleepTrendChart data={sleepPerfData} />
-    </div>
-  )}
-</div>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>Sleep Performance Trend</h3>
-          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px' }}>Last 7 nights</p>
-          <SleepTrendChart data={sleepPerfData} />
-        </div>
-      )}
 
       {/* Tips */}
       <div style={{ ...glass, padding: '20px' }}>
