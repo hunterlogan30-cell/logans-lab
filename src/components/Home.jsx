@@ -91,8 +91,10 @@ export default function Home() {
     { label: 'Rest', value: '87', icon: Icons.moon('white', 18) },
   ]
 
+  const pad = wide ? '40px 40px 24px 40px' : '48px 16px 16px'
+
   return (
-    <div style={{ padding: wide ? '40px 0 24px' : '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ padding: pad, display: 'flex', flexDirection: 'column', gap: '24px', boxSizing: 'border-box', width: '100%' }}>
 
       {/* Header */}
       <div>
@@ -103,14 +105,13 @@ export default function Home() {
       </div>
 
       {wide ? (
-        // ── Desktop / iPad layout ──────────────────────────────────────────
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'start', width: '100%' }}>
 
           {/* Left column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
 
             {/* Overall Score */}
-            <div style={{ ...glass, padding: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ ...glass, padding: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', overflow: 'hidden' }}>
               <div>
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '500' }}>Overall Score</p>
                 <p style={{ fontSize: '64px', fontWeight: '700', lineHeight: 1, letterSpacing: '-2px' }}>85</p>
@@ -119,7 +120,7 @@ export default function Home() {
                   <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>+5% from yesterday</span>
                 </div>
               </div>
-              <div style={{ background: 'linear-gradient(135deg, #10B981, #059669)', borderRadius: '50%', width: '96px', height: '96px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 20px 40px rgba(16,185,129,0.3)' }}>
+              <div style={{ background: 'linear-gradient(135deg, #10B981, #059669)', borderRadius: '50%', width: '96px', height: '96px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 20px 40px rgba(16,185,129,0.3)' }}>
                 {Icons.activity('white', 44)}
               </div>
             </div>
@@ -145,7 +146,7 @@ export default function Home() {
           </div>
 
           {/* Right column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
 
             {/* Weekly Trend */}
             <div style={{ ...glass, padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -168,20 +169,17 @@ export default function Home() {
                 ))}
               </div>
             </div>
-
           </div>
         </div>
       ) : (
-        // ── Mobile layout ──────────────────────────────────────────────────
         <>
-          {/* Overall Score */}
           <div style={{ ...glass, padding: '25px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>Overall Score</p>
                 <p style={{ fontSize: '48px', fontWeight: '700', lineHeight: 1 }}>85</p>
               </div>
-              <div style={{ background: 'linear-gradient(135deg, #10B981, #059669)', borderRadius: '50%', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 20px 25px rgba(0,0,0,0.1)' }}>
+              <div style={{ background: 'linear-gradient(135deg, #10B981, #059669)', borderRadius: '50%', width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 20px 25px rgba(0,0,0,0.1)' }}>
                 {Icons.activity('white', 36)}
               </div>
             </div>
@@ -191,7 +189,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Metric Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
             {metricCards.map(m => (
               <div key={m.label} style={{ ...glass, padding: '17px', height: '138px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -204,19 +201,16 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Weekly Trend */}
           <div style={{ ...glass, padding: '21px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h3 style={{ fontSize: '18px', fontWeight: '600' }}>Weekly Trend</h3>
             <WeeklyChart />
           </div>
 
-          {/* Ask Agent */}
           <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
             <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.9)' }}>Ask Agent...</span>
             {Icons.send()}
           </div>
 
-          {/* Today at a Glance */}
           <div style={{ ...glass, padding: '21px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h3 style={{ fontSize: '18px', fontWeight: '600' }}>Today at a Glance</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
