@@ -512,3 +512,4 @@ useEffect(() => {
     )}
   </div>
 )
+echo "}" >> src/components/Schedule.jsx
