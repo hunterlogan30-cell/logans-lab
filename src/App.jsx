@@ -131,11 +131,13 @@ export default function App() {
         <div style={{ display: 'flex', minHeight: '100dvh' }}>
           <BottomNav tab={tab} setTab={setTab} />
           <div style={{
-            marginLeft: '220px',
-            flex: 1,
-            minHeight: '100dvh',
-            overflowY: 'auto',
-          }}>
+  marginLeft: '220px',
+  flex: 1,
+  minHeight: '100dvh',
+  overflowY: 'auto',
+  width: 'calc(100vw - 220px)',
+  boxSizing: 'border-box',
+}}>
             {tabContent}
           </div>
         </div>
