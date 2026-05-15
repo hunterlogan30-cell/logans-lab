@@ -63,10 +63,10 @@ const metricIconBg = {
 }
 
 export default function Home() {
-const [wide, setWide] = useState(window.innerWidth >= 768)
+const [wide, setWide] = useState(window.innerWidth >= 1024)
 
   useEffect(() => {
-   const handler = () => setWide(window.innerWidth >= 768)
+   const handler = () => setWide(window.innerWidth >= 1024)
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
@@ -91,7 +91,7 @@ const [wide, setWide] = useState(window.innerWidth >= 768)
     { label: 'Rest', value: '87', icon: Icons.moon('white', 18) },
   ]
 
-  const pad = wide ? '40px 40px 24px 40px' : '48px 16px 16px'
+ const pad = wide ? '40px 40px 24px 40px' : '32px 24px 16px'
 
   return (
     <div style={{ padding: pad, display: 'flex', flexDirection: 'column', gap: '24px', boxSizing: 'border-box', width: '100%' }}>
@@ -104,8 +104,8 @@ const [wide, setWide] = useState(window.innerWidth >= 768)
         </p>
       </div>
 
-      {wide ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'start', width: '100%' }}>
+      {window.innerWidth >= 1024 ? (
+  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'start', width: '100%' }}>
 
           {/* Left column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
