@@ -58,17 +58,18 @@ function getTips(score) {
   ]
 }
 
-export default function Recovery() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+export default function Recovery({ whoopData }) {
+  const [data, setData] = useState(whoopData || null)
+  const [loading, setLoading] = useState(!whoopData)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-   fetch(`/api/whoop/data?t=${Date.now()}`)
+    if (whoopData) { setData(whoopData); setLoading(false); return }
+    fetch(`/api/whoop/data?t=${Date.now()}`)
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
-  }, [])
+  }, [whoopData])
 
   if (loading) return (
     <div style={{ padding: '48px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -79,21 +80,16 @@ export default function Recovery() {
   if (error || !data) return (
     <div style={{ padding: '48px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
       <p style={{ color: 'rgba(255,255,255,0.5)' }}>Not connected to Whoop</p>
-      <a href="/api/whoop/auth" style={{
-        padding: '12px 24px', borderRadius: '14px',
-        background: 'linear-gradient(135deg, #6366F1, #4F46E5)',
-        color: 'white', fontWeight: '600', fontSize: '14px', textDecoration: 'none'
-      }}>Connect Whoop</a>
+      <a href="/api/whoop/auth" style={{ padding: '12px 24px', borderRadius: '14px', background: 'linear-gradient(135deg, #6366F1, #4F46E5)', color: 'white', fontWeight: '600', fontSize: '14px', textDecoration: 'none' }}>Connect Whoop</a>
     </div>
   )
 
-  // Parse sleep data
-  const sleep = data.sleep?.records?.[0]
+  // Parse today's sleep
+  const sleepRecords = data.sleep?.records || []
+  const sleep = sleepRecords[0]
   const sleepScore = sleep?.score
   const stages = sleepScore?.stage_summary
-  const totalSleepMs = stages
-    ? stages.total_light_sleep_time_milli + stages.total_slow_wave_sleep_time_milli + stages.total_rem_sleep_time_milli
-    : 0
+  const totalSleepMs = stages ? stages.total_light_sleep_time_milli + stages.total_slow_wave_sleep_time_milli + stages.total_rem_sleep_time_milli : 0
   const totalInBedMs = stages?.total_in_bed_time_milli || 1
   const awakePct = stages ? Math.round(stages.total_awake_time_milli / totalInBedMs * 100) : 0
   const remPct = stages ? Math.round(stages.total_rem_sleep_time_milli / totalInBedMs * 100) : 0
@@ -102,30 +98,32 @@ export default function Recovery() {
   const sleepHrs = msToHrs(totalSleepMs)
   const sleepPerf = sleepScore?.sleep_performance_percentage || 0
 
-  // Parse cycle/strain data
+  // Parse cycle data for HR
   const cycles = data.cycles?.records || []
   const todayCycle = cycles[0]
-  const todayStrain = todayCycle?.score?.strain?.toFixed(1) || '0'
   const avgHR = todayCycle?.score?.average_heart_rate || 0
 
-  // Weekly strain for chart
-  const weekStrains = [...cycles].reverse().map(c => c.score?.strain || 0)
- const weekDays = cycles.map(c => {
-  const d = new Date(c.start)
-  return ['S','M','T','W','T','F','S'][d.getDay()]
-})
-  const maxStrain = Math.max(...weekStrains, 1)
+  // Sleep performance chart data — last 7 nights
+  const sleepPerfData = [...sleepRecords]
+    .filter(r => !r.nap && r.score?.sleep_performance_percentage)
+    .reverse()
+    .map(r => ({
+      day: ['S','M','T','W','T','F','S'][new Date(r.start).getDay()],
+      perf: r.score.sleep_performance_percentage,
+      isToday: new Date(r.start).toDateString() === new Date().toDateString(),
+    }))
 
-  // Recovery score from sleep performance
+  const maxPerf = Math.max(...sleepPerfData.map(d => d.perf), 1)
+
   const whoopScore = sleepPerf
   const scoreColor = whoopScore >= 67 ? '#10B981' : whoopScore >= 34 ? '#F59E0B' : '#EF4444'
   const scoreLabel = whoopScore >= 67 ? 'Green — Go for it' : whoopScore >= 34 ? 'Yellow — Be careful' : 'Red — Rest up'
 
   const metrics = [
     { key: 'sleep', label: 'Sleep', value: sleepHrs, unit: 'hrs', icon: <MoonIcon /> },
-    { key: 'strain', label: 'Strain', value: todayStrain, unit: '/21', icon: <DumbbellIcon /> },
     { key: 'rhr', label: 'Avg HR', value: avgHR, unit: 'bpm', icon: <HeartIcon /> },
     { key: 'efficiency', label: 'Efficiency', value: sleepScore?.sleep_efficiency_percentage?.toFixed(0) || '--', unit: '%', icon: <ActivityIcon /> },
+    { key: 'consistency', label: 'Consistency', value: sleepScore?.sleep_consistency_percentage?.toFixed(0) || '--', unit: '%', icon: <DumbbellIcon /> },
   ]
 
   const sleepStages = [
@@ -170,9 +168,7 @@ export default function Recovery() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
         {metrics.map(m => (
           <div key={m.key} style={{ ...glass, padding: '16px', borderRadius: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ ...iconBg, width: '36px', height: '36px', borderRadius: '12px' }}>{m.icon}</div>
-            </div>
+            <div style={{ ...iconBg, width: '36px', height: '36px', borderRadius: '12px' }}>{m.icon}</div>
             <p style={{ fontSize: '26px', fontWeight: '700', marginTop: '12px', lineHeight: 1 }}>
               {m.value}
               <span style={{ fontSize: '13px', fontWeight: '400', color: 'rgba(255,255,255,0.4)', marginLeft: '3px' }}>{m.unit}</span>
@@ -201,41 +197,45 @@ export default function Recovery() {
         </div>
       </div>
 
-      {/* Weekly strain chart */}
-      <div style={{ ...glass, padding: '20px' }}>
-        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>Strain This Week</h3>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '64px' }}>
-          {weekStrains.map((v, i) => {
-            const h = Math.round((v / maxStrain) * 64)
-            const cycleDate = new Date(cycles[i]?.start)
-const isToday = cycleDate.toDateString() === new Date().toDateString()
-            return (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                <div style={{
-                  width: '100%', height: `${h}px`, borderRadius: '4px',
-                  background: isToday
-                    ? 'linear-gradient(180deg, #6366F1, #4F46E5)'
-                    : 'rgba(255,255,255,0.15)',
-                }} />
-                <span style={{ fontSize: '10px', color: isToday ? 'rgba(199,200,255,0.9)' : 'rgba(255,255,255,0.35)', fontWeight: isToday ? '600' : '400' }}>
-                  {weekDays[i % 7]}
-                </span>
+      {/* Sleep performance chart */}
+      {sleepPerfData.length > 0 && (
+        <div style={{ ...glass, padding: '20px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>Sleep Performance This Week</h3>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '80px' }}>
+            {sleepPerfData.map((d, i) => {
+              const h = Math.round((d.perf / 100) * 80)
+              const barColor = d.perf >= 67 ? '#10B981' : d.perf >= 34 ? '#F59E0B' : '#EF4444'
+              return (
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '9px', fontWeight: '600', color: d.isToday ? '#fff' : 'rgba(255,255,255,0.4)' }}>{d.perf}%</span>
+                  <div style={{
+                    width: '100%', height: `${h}px`, borderRadius: '6px',
+                    background: d.isToday ? barColor : `${barColor}66`,
+                    boxShadow: d.isToday ? `0 0 12px ${barColor}66` : 'none',
+                    transition: 'all 0.3s',
+                  }} />
+                  <span style={{ fontSize: '10px', color: d.isToday ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)', fontWeight: d.isToday ? '700' : '400' }}>{d.day}</span>
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '14px' }}>
+            {[{ color: '#10B981', label: 'Good (67%+)' }, { color: '#F59E0B', label: 'Ok (34–66%)' }, { color: '#EF4444', label: 'Low (<34%)' }].map(l => (
+              <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: l.color }} />
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>{l.label}</span>
               </div>
-            )
-          })}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Tips */}
       <div style={{ ...glass, padding: '20px' }}>
         <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Today's Recommendations</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {tips.map((tip, i) => (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center', gap: '12px',
-              padding: '12px 14px', borderRadius: '14px', background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.08)',
-            }}>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderRadius: '14px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <div style={{ ...iconBg, width: '32px', height: '32px', borderRadius: '10px' }}>{tip.icon}</div>
               <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>{tip.text}</span>
             </div>

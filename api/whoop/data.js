@@ -58,7 +58,7 @@ export default async function handler(req, res) {
 
   const [cycleRes, sleepRes] = await Promise.all([
     fetch('https://api.prod.whoop.com/developer/v1/cycle?limit=7', { headers }),
-    fetch('https://api.prod.whoop.com/developer/v2/activity/sleep?limit=1', { headers }),
+    fetch('https://api.prod.whoop.com/developer/v2/activity/sleep?limit=7', { headers }),
   ]);
 
   const cycles = await cycleRes.json();
