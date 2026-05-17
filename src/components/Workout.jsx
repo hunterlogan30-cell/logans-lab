@@ -345,7 +345,7 @@ function BodyWeightSection() {
   const today = new Date().toISOString().split('T')[0]
 
   useEffect(() => {
-   const handler = () => setWide(window.innerWidth >= 1024)
+   const handler = () => setWide(window.innerWidth >= 768)
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
@@ -383,7 +383,7 @@ function BodyWeightSection() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      <div style={{ display: wide ? 'grid' : 'flex', gridTemplateColumns: wide ? '380px 1fr' : undefined, flexDirection: wide ? undefined : 'column', gap: '14px', alignItems: 'start' }}>
+      <div style={{ display: window.innerWidth >= 1024 ? 'grid' : 'flex', gridTemplateColumns: window.innerWidth >= 1024 ? '380px 1fr' : undefined, flexDirection: window.innerWidth >= 1024 ? undefined : 'column', gap: '14px', alignItems: 'start' }}>
 
         {/* Log form */}
         <div style={{ ...glass, padding: '20px' }}>
@@ -449,7 +449,7 @@ function BodyWeightSection() {
       {logs.length > 0 && (
         <div style={{ ...glass, padding: '20px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>History</h3>
-          <div style={{ display: wide ? 'grid' : 'flex', gridTemplateColumns: wide ? '1fr 1fr 1fr' : undefined, flexDirection: wide ? undefined : 'column', gap: '6px', maxHeight: wide ? 'none' : '240px', overflowY: wide ? 'visible' : 'auto' }}>
+          <div style={{ display: window.innerWidth >= 1024 ? 'grid' : 'flex', gridTemplateColumns: window.innerWidth >= 1024 ? '1fr 1fr 1fr' : undefined, flexDirection: window.innerWidth >= 1024 ? undefined : 'column', gap: '6px', maxHeight: window.innerWidth >= 1024 ? 'none' : '240px', overflowY: window.innerWidth >= 1024 ? 'visible' : 'auto' }}>
             {[...logs].reverse().map(l => (
               <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: '12px', background: l.logged_date === today ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${l.logged_date === today ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.08)'}` }}>
                 <div>
