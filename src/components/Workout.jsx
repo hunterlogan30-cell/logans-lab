@@ -386,7 +386,7 @@ function BodyWeightSection() {
       <div style={{ display: window.innerWidth >= 1024 ? 'grid' : 'flex', gridTemplateColumns: window.innerWidth >= 1024 ? '380px 1fr' : undefined, flexDirection: window.innerWidth >= 1024 ? undefined : 'column', gap: '14px', alignItems: 'start' }}>
 
         {/* Log form */}
-        <div style={{ ...glass, padding: '20px' }}>
+       <div style={{ ...glass, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Log Today's Weight</h3>
             {latest && (
