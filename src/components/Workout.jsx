@@ -382,8 +382,8 @@ function BodyWeightSection() {
   const diff = latest && prev ? (parseFloat(latest.weight_lbs) - parseFloat(prev.weight_lbs)).toFixed(1) : null
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      <div style={{ display: window.innerWidth >= 1024 ? 'grid' : 'flex', gridTemplateColumns: window.innerWidth >= 1024 ? '380px 1fr' : undefined, flexDirection: window.innerWidth >= 1024 ? undefined : 'column', gap: '14px', alignItems: 'start' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', boxSizing: 'border-box' }}>
+    <div style={{ display: window.innerWidth >= 1024 ? 'grid' : 'flex',
 
         {/* Log form */}
        <div style={{ ...glass, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
@@ -461,8 +461,9 @@ function BodyWeightSection() {
             ))}
           </div>
         </div>
-      )}
+     )}
     </div>
+  </div>
   )
 }
 
