@@ -382,11 +382,9 @@ function BodyWeightSection() {
   const diff = latest && prev ? (parseFloat(latest.weight_lbs) - parseFloat(prev.weight_lbs)).toFixed(1) : null
 
   return (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', boxSizing: 'border-box' }}>
-    <div style={{ display: window.innerWidth >= 1024 ? 'grid' : 'flex',
-
-        {/* Log form */}
-       <div style={{ ...glass, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', boxSizing: 'border-box' }}>
+      <div style={{ display: window.innerWidth >= 1024 ? 'grid' : 'flex', gridTemplateColumns: window.innerWidth >= 1024 ? '380px 1fr' : undefined, flexDirection: window.innerWidth >= 1024 ? undefined : 'column', gap: '14px', alignItems: 'start' }}>
+        <div style={{ ...glass, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Log Today's Weight</h3>
             {latest && (
@@ -409,9 +407,8 @@ function BodyWeightSection() {
           <button onClick={save} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : todayLog ? 'Update' : 'Log weight'}</button>
         </div>
 
-        {/* Chart + stats */}
         {logs.length >= 2 && (
-          <div style={{ ...glass, padding: '20px' }}>
+          <div style={{ ...glass, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Progress</h3>
               <div style={{ display: 'flex', gap: '6px' }}>
@@ -445,6 +442,26 @@ function BodyWeightSection() {
         )}
       </div>
 
+      {logs.length > 0 && (
+        <div style={{ ...glass, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>History</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '240px', overflowY: 'auto' }}>
+            {[...logs].reverse().map(l => (
+              <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: '12px', background: l.logged_date === today ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${l.logged_date === today ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.08)'}` }}>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: '500', color: '#fff' }}>{new Date(l.logged_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                  {l.notes && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>{l.notes}</p>}
+                </div>
+                <p style={{ fontSize: '16px', fontWeight: '700' }}>{l.weight_lbs} <span style={{ fontSize: '12px', fontWeight: '400', color: 'rgba(255,255,255,0.4)' }}>lbs</span></p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
       {/* History */}
       {logs.length > 0 && (
         <div style={{ ...glass, padding: '20px' }}>
@@ -464,7 +481,7 @@ function BodyWeightSection() {
      )}
     </div>
   </div>
-  )
+)
 }
 
 // ── Exercise Row ──────────────────────────────────────────────────────────────
