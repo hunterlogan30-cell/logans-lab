@@ -245,7 +245,7 @@ export default function Recovery({ whoopData }) {
   const tips = getTips(whoopScore)
 
   return (
-   <div style={{ padding: '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+   <div style={{ padding: '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
 
       <div>
         <h1 style={{ fontSize: '24px', fontWeight: '700' }}>Recovery</h1>
