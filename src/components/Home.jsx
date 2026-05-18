@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { supabase } from '../supabase'
 import WeeklyChart from './WeeklyChart'
 
 const glass = {
@@ -23,7 +24,6 @@ const Icons = {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 22c0 0-8-4.5-8-11a8 8 0 0 1 16 0c0 6.5-8 11-8 11z"/>
       <path d="M12 22c0 0 4-6 4-11"/><path d="M12 22c0 0-4-6-4-11"/>
-      <path d="M12 11c0-3 1.5-6 4-8-1 3-1 6 0 8"/><path d="M12 11c0-3-1.5-6-4-8 1 3 1 6 0 8"/>
     </svg>
   ),
   moon: (color = 'white', size = 20) => (
@@ -36,14 +36,14 @@ const Icons = {
       <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
     </svg>
   ),
+  trendingDown: (color = '#EF4444', size = 16) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/>
+    </svg>
+  ),
   send: (color = 'rgba(255,255,255,0.4)', size = 20) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-    </svg>
-  ),
-  star: (color = 'white', size = 20) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
     </svg>
   ),
   activity: (color = 'white', size = 20) => (
@@ -62,14 +62,134 @@ const metricIconBg = {
   flexShrink: 0,
 }
 
+// Weights: sleep 40, workout 25, schedule 20, spirit 15
+const WEIGHTS = { sleep: 40, workout: 25, schedule: 20, spirit: 15 }
+
+const calcOverall = ({ sleep, workout, schedule, spirit }) => {
+  const pillars = [
+    { score: sleep, weight: WEIGHTS.sleep },
+    { score: workout, weight: WEIGHTS.workout },
+    { score: schedule, weight: WEIGHTS.schedule },
+    { score: spirit, weight: WEIGHTS.spirit },
+  ].filter(p => p.score !== null)
+
+  if (!pillars.length) return null
+  const totalWeight = pillars.reduce((a, p) => a + p.weight, 0)
+  const weighted = pillars.reduce((a, p) => a + p.score * p.weight, 0)
+  return Math.round(weighted / totalWeight)
+}
+
+const scoreColor = (s) => {
+  if (s === null) return 'rgba(255,255,255,0.4)'
+  if (s >= 80) return '#10B981'
+  if (s >= 60) return '#F59E0B'
+  return '#EF4444'
+}
+
 export default function Home() {
-const [wide, setWide] = useState(window.innerWidth >= 1024)
+  const [wide, setWide] = useState(window.innerWidth >= 1024)
+  const [loading, setLoading] = useState(true)
+  const [scores, setScores] = useState({ sleep: null, workout: null, schedule: null, spirit: null, overall: null })
+  const [yesterday, setYesterday] = useState(null)
+  const [glanceData, setGlanceData] = useState([])
+
+  const today = new Date().toISOString().split('T')[0]
+  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0]
 
   useEffect(() => {
-   const handler = () => setWide(window.innerWidth >= 1024)
+    const handler = () => setWide(window.innerWidth >= 1024)
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
+
+  useEffect(() => { loadAll() }, [])
+
+  const loadAll = async () => {
+    setLoading(true)
+    try {
+      // ── Fetch all sources in parallel ──
+      const [
+        whoopRes,
+        { data: scheduleBlocks },
+        { data: workoutLogs },
+        { data: spiritDaily },
+        { data: spiritEntries },
+        { data: spiritIntentionLogs },
+        { data: yesterdayScore },
+      ] = await Promise.all([
+        fetch('/api/whoop/data?limit=1').then(r => r.json()).catch(() => null),
+        supabase.from('schedule_blocks').select('done').eq('date', today),
+        supabase.from('workout_logs').select('id').eq('logged_date', today).limit(1),
+        supabase.from('spirit_daily_logs').select('mood').eq('date', today).maybeSingle(),
+        supabase.from('spirit_journal_entries').select('id').eq('date', today).limit(1),
+        supabase.from('spirit_intention_logs').select('done').eq('date', today),
+        supabase.from('daily_scores').select('overall_score').eq('date', yesterdayStr).maybeSingle(),
+      ])
+
+      // ── Sleep score (Whoop) ──
+      const sleepScore = whoopRes?.sleep?.[0]?.score?.sleep_performance_percentage ?? null
+
+      // ── Workout score ──
+      const workoutScore = workoutLogs && workoutLogs.length > 0 ? 100 : 0
+
+      // ── Schedule score ──
+      let scheduleScore = null
+      if (scheduleBlocks && scheduleBlocks.length > 0) {
+        const done = scheduleBlocks.filter(b => b.done).length
+        scheduleScore = Math.round((done / scheduleBlocks.length) * 100)
+      }
+
+      // ── Spirit score ──
+      const didMeditate = !!(spiritDaily?.mood) // mood logged = they opened spirit today; meditation tracked via daily log
+      const didMood = !!spiritDaily?.mood
+      const didJournal = !!(spiritEntries && spiritEntries.length > 0)
+      // 3 signals × ~33pts each
+      const spiritScore = Math.min(100, Math.round(
+        (didMeditate ? 34 : 0) +
+        (didMood ? 33 : 0) +
+        (didJournal ? 33 : 0)
+      ))
+
+      // ── Overall ──
+      const overall = calcOverall({
+        sleep: sleepScore,
+        workout: workoutScore,
+        schedule: scheduleScore,
+        spirit: spiritScore,
+      })
+
+      setScores({ sleep: sleepScore, workout: workoutScore, schedule: scheduleScore, spirit: spiritScore, overall })
+      setYesterday(yesterdayScore?.overall_score ?? null)
+
+      // ── Upsert today's score ──
+      if (overall !== null) {
+        await supabase.from('daily_scores').upsert({
+          date: today,
+          overall_score: overall,
+          sleep_score: sleepScore,
+          workout_score: workoutScore,
+          schedule_score: scheduleScore,
+          spirit_score: spiritScore,
+        }, { onConflict: 'date' })
+      }
+
+      // ── Today at a glance data ──
+      const sleepHrs = whoopRes?.sleep?.[0]?.score?.stage_summary?.total_in_bed_time_milli
+        ? (whoopRes.sleep[0].score.stage_summary.total_in_bed_time_milli / 3600000).toFixed(1)
+        : null
+      const doneBlocks = scheduleBlocks?.filter(b => b.done).length ?? 0
+      const totalBlocks = scheduleBlocks?.length ?? 0
+
+      setGlanceData([
+        { label: 'Tasks', value: totalBlocks > 0 ? `${doneBlocks}/${totalBlocks}` : '—', icon: Icons.check('rgba(255,255,255,0.7)') },
+        { label: 'Workout', value: workoutLogs?.length > 0 ? 'Done ✓' : 'Not logged', icon: Icons.dumbbell('rgba(255,255,255,0.7)') },
+        { label: 'Spirit', value: `${Math.round(((didMeditate ? 1 : 0) + (didMood ? 1 : 0) + (didJournal ? 1 : 0)) / 3 * 100)}%`, icon: Icons.lotus('rgba(255,255,255,0.7)') },
+        { label: 'Sleep', value: sleepHrs ? `${sleepHrs} hrs` : '—', icon: Icons.moon('rgba(255,255,255,0.7)') },
+      ])
+
+    } catch (e) { console.error(e) }
+    setLoading(false)
+  }
 
   const greeting = () => {
     const h = new Date().getHours()
@@ -78,20 +198,46 @@ const [wide, setWide] = useState(window.innerWidth >= 1024)
     return 'Good evening'
   }
 
-  const quickStats = [
-    { label: 'Tasks', value: '8/12', icon: Icons.check('rgba(255,255,255,0.7)') },
-    { label: 'Workout', value: '45 min', icon: Icons.dumbbell('rgba(255,255,255,0.7)') },
-    { label: 'Meditation', value: '20 min', icon: Icons.lotus('rgba(255,255,255,0.7)') },
-    { label: 'Sleep', value: '8.0 hrs', icon: Icons.moon('rgba(255,255,255,0.7)') },
-  ]
+  const diff = scores.overall !== null && yesterday !== null ? scores.overall - yesterday : null
+  const trendUp = diff !== null && diff >= 0
 
   const metricCards = [
-    { label: 'Focus', value: '78', icon: Icons.star('white', 18) },
-    { label: 'Fitness', value: '92', icon: Icons.dumbbell('white', 18) },
-    { label: 'Rest', value: '87', icon: Icons.moon('white', 18) },
+    { label: 'Sleep', value: scores.sleep !== null ? `${Math.round(scores.sleep)}` : '—', icon: Icons.moon('white', 18) },
+    { label: 'Schedule', value: scores.schedule !== null ? `${scores.schedule}` : '—', icon: Icons.check('white', 18) },
+    { label: 'Spirit', value: scores.spirit !== null ? `${scores.spirit}` : '—', icon: Icons.lotus('white', 18) },
   ]
 
- const pad = wide ? '40px 40px 24px 40px' : '32px 24px 16px'
+  const pad = wide ? '40px 40px 24px 40px' : '48px 16px 16px'
+
+  const OverallCard = ({ big = false }) => (
+    <div style={{ ...glass, padding: big ? '28px' : '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', overflow: 'hidden' }}>
+      <div>
+        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '500' }}>Overall Score</p>
+        {loading ? (
+          <div style={{ width: '80px', height: big ? '64px' : '48px', background: 'rgba(255,255,255,0.1)', borderRadius: '12px', animation: 'pulse 1.5s infinite' }} />
+        ) : (
+          <p style={{ fontSize: big ? '64px' : '48px', fontWeight: '700', lineHeight: 1, letterSpacing: '-2px', color: scoreColor(scores.overall) }}>
+            {scores.overall ?? '—'}
+          </p>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px' }}>
+          {diff !== null ? (
+            <>
+              {trendUp ? Icons.trending() : Icons.trendingDown()}
+              <span style={{ fontSize: '13px', color: trendUp ? '#10B981' : '#EF4444' }}>
+                {trendUp ? '+' : ''}{diff}% from yesterday
+              </span>
+            </>
+          ) : (
+            <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>No yesterday data yet</span>
+          )}
+        </div>
+      </div>
+      <div style={{ background: `linear-gradient(135deg, ${scoreColor(scores.overall)}, ${scoreColor(scores.overall)}99)`, borderRadius: '50%', width: big ? '96px' : '80px', height: big ? '96px' : '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 20px 40px ${scoreColor(scores.overall)}44` }}>
+        {Icons.activity('white', big ? 44 : 36)}
+      </div>
+    </div>
+  )
 
   return (
     <div style={{ padding: pad, display: 'flex', flexDirection: 'column', gap: '24px', boxSizing: 'border-box', width: '100%' }}>
@@ -99,39 +245,26 @@ const [wide, setWide] = useState(window.innerWidth >= 1024)
       {/* Header */}
       <div>
         <h1 style={{ fontSize: wide ? '32px' : '24px', fontWeight: '700', letterSpacing: '-0.5px' }}>Logan's Lab</h1>
-        <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', marginTop: '4px' }}>
-          {greeting()} — holistic well-being tracker.
-        </p>
+        <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', marginTop: '4px' }}>{greeting()} — holistic well-being tracker.</p>
       </div>
 
-      {window.innerWidth >= 1024 ? (
-  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'start', width: '100%' }}>
+      {wide ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'start', width: '100%' }}>
 
           {/* Left column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+            <OverallCard big />
 
-            {/* Overall Score */}
-            <div style={{ ...glass, padding: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', overflow: 'hidden' }}>
-              <div>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '500' }}>Overall Score</p>
-                <p style={{ fontSize: '64px', fontWeight: '700', lineHeight: 1, letterSpacing: '-2px' }}>85</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px' }}>
-                  {Icons.trending()}
-                  <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>+5% from yesterday</span>
-                </div>
-              </div>
-              <div style={{ background: 'linear-gradient(135deg, #10B981, #059669)', borderRadius: '50%', width: '96px', height: '96px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 20px 40px rgba(16,185,129,0.3)' }}>
-                {Icons.activity('white', 44)}
-              </div>
-            </div>
-
-            {/* Metric Cards */}
+            {/* Pillar scores */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
               {metricCards.map(m => (
                 <div key={m.label} style={{ ...glass, padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '130px' }}>
                   <div style={metricIconBg}>{m.icon}</div>
                   <div>
-                    <p style={{ fontSize: '28px', fontWeight: '700' }}>{m.value}</p>
+                    {loading
+                      ? <div style={{ width: '48px', height: '28px', background: 'rgba(255,255,255,0.1)', borderRadius: '8px', animation: 'pulse 1.5s infinite' }} />
+                      : <p style={{ fontSize: '28px', fontWeight: '700', color: scoreColor(typeof m.value === 'string' && m.value !== '—' ? parseInt(m.value) : null) }}>{m.value}</p>
+                    }
                     <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginTop: '2px' }}>{m.label}</p>
                   </div>
                 </div>
@@ -147,24 +280,21 @@ const [wide, setWide] = useState(window.innerWidth >= 1024)
 
           {/* Right column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
-
-            {/* Weekly Trend */}
             <div style={{ ...glass, padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Weekly Trend</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: '600' }}>7-Day Trend</h3>
               <WeeklyChart />
             </div>
 
-            {/* Today at a Glance */}
             <div style={{ ...glass, padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Today at a Glance</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                {quickStats.map(s => (
+                {glanceData.map(s => (
                   <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {s.icon}
                       <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>{s.label}</span>
                     </div>
-                    <span style={{ fontSize: '20px', fontWeight: '700' }}>{s.value}</span>
+                    <span style={{ fontSize: '20px', fontWeight: '700' }}>{loading ? '—' : s.value}</span>
                   </div>
                 ))}
               </div>
@@ -173,28 +303,17 @@ const [wide, setWide] = useState(window.innerWidth >= 1024)
         </div>
       ) : (
         <>
-          <div style={{ ...glass, padding: '25px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>Overall Score</p>
-                <p style={{ fontSize: '48px', fontWeight: '700', lineHeight: 1 }}>85</p>
-              </div>
-              <div style={{ background: 'linear-gradient(135deg, #10B981, #059669)', borderRadius: '50%', width: '80px', height: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 20px 25px rgba(0,0,0,0.1)' }}>
-                {Icons.activity('white', 36)}
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {Icons.trending()}
-              <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)' }}>+5% from yesterday</span>
-            </div>
-          </div>
+          <OverallCard />
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
             {metricCards.map(m => (
               <div key={m.label} style={{ ...glass, padding: '17px', height: '138px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div style={metricIconBg}>{m.icon}</div>
                 <div>
-                  <p style={{ fontSize: '24px', fontWeight: '700' }}>{m.value}</p>
+                  {loading
+                    ? <div style={{ width: '40px', height: '24px', background: 'rgba(255,255,255,0.1)', borderRadius: '8px', animation: 'pulse 1.5s infinite' }} />
+                    : <p style={{ fontSize: '24px', fontWeight: '700', color: scoreColor(typeof m.value === 'string' && m.value !== '—' ? parseInt(m.value) : null) }}>{m.value}</p>
+                  }
                   <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', marginTop: '2px' }}>{m.label}</p>
                 </div>
               </div>
@@ -202,7 +321,7 @@ const [wide, setWide] = useState(window.innerWidth >= 1024)
           </div>
 
           <div style={{ ...glass, padding: '21px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '600' }}>Weekly Trend</h3>
+            <h3 style={{ fontSize: '18px', fontWeight: '600' }}>7-Day Trend</h3>
             <WeeklyChart />
           </div>
 
@@ -214,19 +333,23 @@ const [wide, setWide] = useState(window.innerWidth >= 1024)
           <div style={{ ...glass, padding: '21px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h3 style={{ fontSize: '18px', fontWeight: '600' }}>Today at a Glance</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {quickStats.map(s => (
+              {glanceData.map(s => (
                 <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {s.icon}
                     <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.9)' }}>{s.label}</span>
                   </div>
-                  <span style={{ fontSize: '16px', fontWeight: '600' }}>{s.value}</span>
+                  <span style={{ fontSize: '16px', fontWeight: '600' }}>{loading ? '—' : s.value}</span>
                 </div>
               ))}
             </div>
           </div>
         </>
       )}
+
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+      `}</style>
     </div>
   )
 }
