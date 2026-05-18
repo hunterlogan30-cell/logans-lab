@@ -88,7 +88,6 @@ const vibrate = (pattern = [200,100,200]) => {
   try { if (navigator.vibrate) navigator.vibrate(pattern) } catch(e) {}
 }
 
-// ── Workout Timer ─────────────────────────────────────────────────────────────
 function WorkoutTimer({ elapsed, running, onToggle, onStop }) {
   return (
     <div style={{ ...glass, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -108,7 +107,6 @@ function WorkoutTimer({ elapsed, running, onToggle, onStop }) {
   )
 }
 
-// ── Rest Timer ────────────────────────────────────────────────────────────────
 function RestTimer({ restSeconds, onDismiss }) {
   const endTimeRef = useRef(Date.now() + restSeconds * 1000)
   const [remaining, setRemaining] = useState(restSeconds)
@@ -215,7 +213,6 @@ function RestTimer({ restSeconds, onDismiss }) {
   )
 }
 
-// ── Progress Chart ────────────────────────────────────────────────────────────
 function ProgressChart({ data, unit = 'lbs' }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
@@ -333,9 +330,7 @@ function ProgressChart({ data, unit = 'lbs' }) {
   )
 }
 
-// ── Body Weight Section ───────────────────────────────────────────────────────
 function BodyWeightSection() {
- const [wide, setWide] = useState(window.innerWidth >= 1024)
   const [logs, setLogs] = useState([])
   const [todayLog, setTodayLog] = useState(null)
   const [weight, setWeight] = useState('')
@@ -343,12 +338,7 @@ function BodyWeightSection() {
   const [saving, setSaving] = useState(false)
   const [range, setRange] = useState('month')
   const today = new Date().toISOString().split('T')[0]
-
-  useEffect(() => {
-   const handler = () => setWide(window.innerWidth >= 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
+  const isDesktop = window.innerWidth >= 1024
 
   useEffect(() => { loadLogs() }, [])
 
@@ -383,7 +373,7 @@ function BodyWeightSection() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', boxSizing: 'border-box' }}>
-      <div style={{ display: window.innerWidth >= 1024 ? 'grid' : 'flex', gridTemplateColumns: window.innerWidth >= 1024 ? '380px 1fr' : undefined, flexDirection: window.innerWidth >= 1024 ? undefined : 'column', gap: '14px', alignItems: 'start' }}>
+      <div style={{ display: isDesktop ? 'grid' : 'flex', gridTemplateColumns: isDesktop ? '380px 1fr' : undefined, flexDirection: isDesktop ? undefined : 'column', gap: '14px', alignItems: 'start', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ ...glass, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Log Today's Weight</h3>
@@ -462,33 +452,9 @@ function BodyWeightSection() {
   )
 }
 
-      {/* History */}
-      {logs.length > 0 && (
-        <div style={{ ...glass, padding: '20px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>History</h3>
-          <div style={{ display: window.innerWidth >= 1024 ? 'grid' : 'flex', gridTemplateColumns: window.innerWidth >= 1024 ? '1fr 1fr 1fr' : undefined, flexDirection: window.innerWidth >= 1024 ? undefined : 'column', gap: '6px', maxHeight: window.innerWidth >= 1024 ? 'none' : '240px', overflowY: window.innerWidth >= 1024 ? 'visible' : 'auto' }}>
-            {[...logs].reverse().map(l => (
-              <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: '12px', background: l.logged_date === today ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${l.logged_date === today ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.08)'}` }}>
-                <div>
-                  <p style={{ fontSize: '13px', fontWeight: '500', color: '#fff' }}>{new Date(l.logged_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
-                  {l.notes && <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>{l.notes}</p>}
-                </div>
-                <p style={{ fontSize: '16px', fontWeight: '700' }}>{l.weight_lbs} <span style={{ fontSize: '12px', fontWeight: '400', color: 'rgba(255,255,255,0.4)' }}>lbs</span></p>
-              </div>
-            ))}
-          </div>
-        </div>
-     )}
-    </div>
-  </div>
-)
-}
-
-// ── Exercise Row ──────────────────────────────────────────────────────────────
 function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, onStartRest, dragHandleProps }) {
   const [expanded, setExpanded] = useState(false)
   const [variantsOpen, setVariantsOpen] = useState(false)
-
   const exLog = todayLogs[ex.id] || {}
   const lwLog = lastWeekLogs[ex.id] || {}
 
@@ -504,9 +470,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
   return (
     <div style={{ borderRadius: isVariant ? '14px' : '18px', background: exLog.done ? 'rgba(16,185,129,0.08)' : isVariant ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)', border: `1px solid ${exLog.done ? 'rgba(16,185,129,0.25)' : isVariant ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.15)'}`, overflow: 'hidden', transition: 'background 0.2s, border 0.2s' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: isVariant ? '11px 14px' : '14px 16px' }}>
-        {!isVariant && dragHandleProps && (
-          <div {...dragHandleProps}><DragIcon /></div>
-        )}
+        {!isVariant && dragHandleProps && <div {...dragHandleProps}><DragIcon /></div>}
         {isVariant && <div style={{ width: '2px', height: '28px', background: 'rgba(99,102,241,0.4)', borderRadius: '1px', flexShrink: 0 }} />}
         <div onClick={toggleDone} style={{ width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, cursor: 'pointer', background: exLog.done ? '#10B981' : 'rgba(255,255,255,0.1)', border: `2px solid ${exLog.done ? '#10B981' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {exLog.done && <CheckIcon />}
@@ -610,7 +574,6 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
   )
 }
 
-// ── Sortable Exercise List ─────────────────────────────────────────────────────
 function SortableExerciseList({ exercises, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, onReorder, onStartRest }) {
   const [items, setItems] = useState(exercises)
   const [draggingIdx, setDraggingIdx] = useState(null)
@@ -682,7 +645,6 @@ function SortableExerciseList({ exercises, todayLogs, lastWeekLogs, onEdit, onAd
   )
 }
 
-// ── Main Workout Component ────────────────────────────────────────────────────
 export default function Workout({ workoutActive, workoutElapsed, workoutRunning, onStartWorkout, onStopWorkout, onToggleTimer, recoveryScore }) {
   const [wide, setWide] = useState(window.innerWidth >= 768)
   const [programs, setPrograms] = useState([])
@@ -821,7 +783,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   )
 
   return (
-  <div style={{ padding: window.innerWidth >= 1024 ? '40px 40px 24px' : window.innerWidth >= 768 ? '32px 24px 24px' : '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ padding: window.innerWidth >= 1024 ? '40px 40px 24px' : window.innerWidth >= 768 ? '32px 24px 24px' : '48px 16px 16px', display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', boxSizing: 'border-box' }}>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
