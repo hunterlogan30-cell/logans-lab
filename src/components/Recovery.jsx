@@ -128,12 +128,23 @@ function SleepTrendChart({ data }) {
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const dpr = window.devicePixelRatio || 1
-    const cssW = canvas.offsetWidth || 340
-    canvas.width = cssW * dpr; canvas.height = 160 * dpr
-    canvas.style.width = cssW + 'px'; canvas.style.height = '160px'
-    canvas.getContext('2d').scale(dpr, dpr)
-    draw()
+
+    const setup = () => {
+      const dpr = window.devicePixelRatio || 1
+      const cssW = canvas.offsetWidth || canvas.parentElement?.offsetWidth || 300
+      canvas.width = cssW * dpr
+      canvas.height = 160 * dpr
+      canvas.style.width = cssW + 'px'
+      canvas.style.height = '160px'
+      canvas.getContext('2d').setTransform(1, 0, 0, 1, 0, 0)
+      canvas.getContext('2d').scale(dpr, dpr)
+      draw()
+    }
+
+    setup()
+    const ro = new ResizeObserver(() => setup())
+    ro.observe(canvas.parentElement || canvas)
+    return () => ro.disconnect()
   }, [data])
 
   const handleInteraction = (clientX) => {
