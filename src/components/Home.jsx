@@ -105,92 +105,85 @@ export default function Home() {
   useEffect(() => { loadAll() }, [])
 
   const loadAll = async () => {
-    setLoading(true)
-    try {
-      // ── Fetch all sources in parallel ──
-      const [
-        whoopRes,
-        { data: scheduleBlocks },
-        { data: workoutLogs },
-        { data: spiritDaily },
-        { data: spiritEntries },
-        { data: spiritIntentionLogs },
-        { data: yesterdayScore },
-      ] = await Promise.all([
-        fetch('/api/whoop/data?limit=1').then(r => r.json()).catch(() => null),
-        supabase.from('schedule_blocks').select('done').eq('date', today),
-        supabase.from('workout_logs').select('id').eq('logged_date', today).limit(1),
-        supabase.from('spirit_daily_logs').select('mood').eq('date', today).maybeSingle(),
-        supabase.from('spirit_journal_entries').select('id').eq('date', today).limit(1),
-        supabase.from('spirit_intention_logs').select('done').eq('date', today),
-        supabase.from('daily_scores').select('overall_score').eq('date', yesterdayStr).maybeSingle(),
-      ])
+  setLoading(true)
+  try {
+    const [
+      whoopRes,
+      { data: scheduleBlocks },
+      { data: workoutLogs },
+      { data: spiritDaily },
+      { data: spiritEntries },
+      { data: spiritIntentionLogs },
+      { data: yesterdayScore },
+    ] = await Promise.all([
+      fetch('/api/whoop/data?limit=1').then(r => r.json()).catch(() => null),
+      supabase.from('schedule_blocks').select('done').eq('date', today),
+      supabase.from('workout_logs').select('id').eq('logged_date', today).limit(1),
+      supabase.from('spirit_daily_logs').select('mood').eq('date', today).maybeSingle(),
+      supabase.from('spirit_journal_entries').select('id').eq('date', today).limit(1),
+      supabase.from('spirit_intention_logs').select('done').eq('date', today),
+      supabase.from('daily_scores').select('overall_score').eq('date', yesterdayStr).maybeSingle(),
+    ])
 
-      // ── Sleep score (Whoop) ──
-     const sleepScore = whoopRes?.sleep?.records?.[0]?.score?.sleep_performance_percentage ?? null
+    // ── Sleep score (Whoop) ──
+    const sleepRecord = whoopRes?.sleep?.records?.find(r => r?.score !== null)
+    const sleepScore = sleepRecord?.score?.sleep_performance_percentage ?? null
+    const sleepHrs = sleepRecord?.score?.stage_summary?.total_in_bed_time_milli
+      ? (sleepRecord.score.stage_summary.total_in_bed_time_milli / 3600000).toFixed(1)
+      : null
 
-      // ── Workout score ──
-      const workoutScore = workoutLogs && workoutLogs.length > 0 ? 100 : 0
+    // ── Workout score ──
+    const workoutScore = workoutLogs && workoutLogs.length > 0 ? 100 : 0
 
-      // ── Schedule score ──
-      let scheduleScore = null
-      if (scheduleBlocks && scheduleBlocks.length > 0) {
-        const done = scheduleBlocks.filter(b => b.done).length
-        scheduleScore = Math.round((done / scheduleBlocks.length) * 100)
-      }
+    // ── Schedule score ──
+    let scheduleScore = null
+    if (scheduleBlocks && scheduleBlocks.length > 0) {
+      const done = scheduleBlocks.filter(b => b.done).length
+      scheduleScore = Math.round((done / scheduleBlocks.length) * 100)
+    }
 
-      // ── Spirit score ──
-      const didMeditate = !!(spiritDaily?.mood) // mood logged = they opened spirit today; meditation tracked via daily log
-      const didMood = !!spiritDaily?.mood
-      const didJournal = !!(spiritEntries && spiritEntries.length > 0)
-      // 3 signals × ~33pts each
-      const spiritScore = Math.min(100, Math.round(
-        (didMeditate ? 34 : 0) +
-        (didMood ? 33 : 0) +
-        (didJournal ? 33 : 0)
-      ))
+    // ── Spirit score ──
+    const didMeditate = !!spiritDaily?.mood
+    const didMood = !!spiritDaily?.mood
+    const didJournal = !!(spiritEntries && spiritEntries.length > 0)
+    const spiritScore = Math.min(100, Math.round(
+      (didMeditate ? 34 : 0) +
+      (didMood ? 33 : 0) +
+      (didJournal ? 33 : 0)
+    ))
 
-      // ── Overall ──
-      const overall = calcOverall({
-        sleep: sleepScore,
-        workout: workoutScore,
-        schedule: scheduleScore,
-        spirit: spiritScore,
-      })
+    // ── Overall ──
+    const overall = calcOverall({ sleep: sleepScore, workout: workoutScore, schedule: scheduleScore, spirit: spiritScore })
 
-      setScores({ sleep: sleepScore, workout: workoutScore, schedule: scheduleScore, spirit: spiritScore, overall })
-      setYesterday(yesterdayScore?.overall_score ?? null)
+    setScores({ sleep: sleepScore, workout: workoutScore, schedule: scheduleScore, spirit: spiritScore, overall })
+    setYesterday(yesterdayScore?.overall_score ?? null)
 
-      // ── Upsert today's score ──
-      if (overall !== null) {
-        await supabase.from('daily_scores').upsert({
-          date: today,
-          overall_score: overall,
-          sleep_score: sleepScore,
-          workout_score: workoutScore,
-          schedule_score: scheduleScore,
-          spirit_score: spiritScore,
-        }, { onConflict: 'date' })
-      }
+    // ── Upsert today's score ──
+    if (overall !== null) {
+      await supabase.from('daily_scores').upsert({
+        date: today,
+        overall_score: overall,
+        sleep_score: sleepScore,
+        workout_score: workoutScore,
+        schedule_score: scheduleScore,
+        spirit_score: spiritScore,
+      }, { onConflict: 'date' })
+    }
 
-      // ── Today at a glance data ──
-      const sleepHrs = whoopRes?.sleep?.records?.[0]?.score?.stage_summary?.total_in_bed_time_milli
-        ? (whoopRes.sleep[0].score.stage_summary.total_in_bed_time_milli / 3600000).toFixed(1)
-        : null
-      const doneBlocks = scheduleBlocks?.filter(b => b.done).length ?? 0
-      const totalBlocks = scheduleBlocks?.length ?? 0
+    // ── Today at a Glance ──
+    const doneBlocks = scheduleBlocks?.filter(b => b.done).length ?? 0
+    const totalBlocks = scheduleBlocks?.length ?? 0
 
-      setGlanceData([
-        { label: 'Tasks', value: totalBlocks > 0 ? `${doneBlocks}/${totalBlocks}` : '—', icon: Icons.check('rgba(255,255,255,0.7)') },
-        { label: 'Workout', value: workoutLogs?.length > 0 ? 'Done ✓' : 'Not logged', icon: Icons.dumbbell('rgba(255,255,255,0.7)') },
-        { label: 'Spirit', value: `${Math.round(((didMeditate ? 1 : 0) + (didMood ? 1 : 0) + (didJournal ? 1 : 0)) / 3 * 100)}%`, icon: Icons.lotus('rgba(255,255,255,0.7)') },
-        { label: 'Sleep', value: sleepHrs ? `${sleepHrs} hrs` : '—', icon: Icons.moon('rgba(255,255,255,0.7)') },
-      ])
+    setGlanceData([
+      { label: 'Tasks', value: totalBlocks > 0 ? `${doneBlocks}/${totalBlocks}` : '—', icon: Icons.check('rgba(255,255,255,0.7)') },
+      { label: 'Workout', value: workoutLogs?.length > 0 ? 'Done ✓' : 'Not logged', icon: Icons.dumbbell('rgba(255,255,255,0.7)') },
+      { label: 'Spirit', value: `${Math.round(((didMeditate ? 1 : 0) + (didMood ? 1 : 0) + (didJournal ? 1 : 0)) / 3 * 100)}%`, icon: Icons.lotus('rgba(255,255,255,0.7)') },
+      { label: 'Sleep', value: sleepHrs ? `${sleepHrs} hrs` : '—', icon: Icons.moon('rgba(255,255,255,0.7)') },
+    ])
 
-    } catch (e) { console.error(e) }
-    setLoading(false)
-  }
-
+  } catch (e) { console.error(e) }
+  setLoading(false)
+}
   const greeting = () => {
     const h = new Date().getHours()
     if (h < 12) return 'Good morning'
