@@ -127,7 +127,7 @@ export default function Home() {
       ])
 
       // ── Sleep score (Whoop) ──
-      const sleepScore = whoopRes?.sleep?.[0]?.score?.sleep_performance_percentage ?? null
+     const sleepScore = whoopRes?.sleep?.records?.[0]?.score?.sleep_performance_percentage ?? null
 
       // ── Workout score ──
       const workoutScore = workoutLogs && workoutLogs.length > 0 ? 100 : 0
@@ -174,7 +174,7 @@ export default function Home() {
       }
 
       // ── Today at a glance data ──
-      const sleepHrs = whoopRes?.sleep?.[0]?.score?.stage_summary?.total_in_bed_time_milli
+      const sleepHrs = whoopRes?.sleep?.records?.[0]?.score?.stage_summary?.total_in_bed_time_milli
         ? (whoopRes.sleep[0].score.stage_summary.total_in_bed_time_milli / 3600000).toFixed(1)
         : null
       const doneBlocks = scheduleBlocks?.filter(b => b.done).length ?? 0
