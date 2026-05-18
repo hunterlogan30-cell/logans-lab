@@ -131,13 +131,14 @@ export default function App() {
   <div style={{ display: 'flex', minHeight: '100dvh' }}>
     <BottomNav tab={tab} setTab={setTab} />
     <div style={{
-      position: 'fixed',
-      left: '220px',
-      top: 0,
-      right: 0,
-      bottom: 0,
-      overflowY: 'auto',
-    }}>
+  position: 'fixed',
+  left: '220px',
+  top: 0,
+  right: 0,
+  bottom: 0,
+  overflowY: 'auto',
+  overflowX: 'hidden',
+}}>
       {tabContent}
     </div>
   </div>
