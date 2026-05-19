@@ -645,7 +645,7 @@ function SortableExerciseList({ exercises, todayLogs, lastWeekLogs, onEdit, onAd
         >
           <ExerciseRow ex={ex} todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
             onEdit={onEdit} onAddVariant={onAddVariant} allCharts={allCharts}
-            setAllCharts={setAllCharts} onLogChange={onLogChange} chartData={chartData[ex.id]}
+            setAllCharts={setAllCharts} onLogChange={onLogChange} chartData={chartData[ex.id] || chartData[String(ex.id)]}
             onStartRest={onStartRest}
             dragHandleProps={{
               onTouchStart: e => onTouchStart(e, i), onTouchMove, onTouchEnd,
