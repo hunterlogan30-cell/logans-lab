@@ -549,7 +549,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px', padding: '8px 12px', borderRadius: '10px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(199,200,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               <span style={{ fontSize: '12px', color: 'rgba(199,200,255,0.7)' }}>
-                Last week: <strong style={{ color: '#fff' }}>{lwLog.weight_used ? `${lwLog.weight_used} lbs` : ''}{lwLog.weight_used && lwLog.reps_done ? ' · ' : ''}{lwLog.reps_done ? `${lwLog.reps_done} reps` : ''}</strong>
+               Last workout: <strong style={{ color: '#fff' }}>{lwLog.weight_used ? `${lwLog.weight_used} lbs` : ''}{lwLog.weight_used && lwLog.reps_done ? ' · ' : ''}{lwLog.reps_done ? `${lwLog.reps_done} reps` : ''}</strong>
               </span>
             </div>
           )}
@@ -702,8 +702,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   const [exForm, setExForm] = useState({ name: '', sets: '', reps: '', weight: '', notes: '', rest_seconds: '90' })
 
   const today = new Date().toISOString().split('T')[0]
-  const lastWeekStart = new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0]
-const lastWeekEnd = new Date(Date.now() - 1 * 86400000).toISOString().split('T')[0]
+ const lastWorkoutDate = new Date(Date.now() - 1 * 86400000).toISOString().split('T')[0]
 
   useEffect(() => {
     const handler = () => setWide(window.innerWidth >= 768)
@@ -719,7 +718,7 @@ const lastWeekEnd = new Date(Date.now() - 1 * 86400000).toISOString().split('T')
       const { data: progs } = await supabase.from('programs').select('*').order('id')
       const { data: exs } = await supabase.from('exercises').select('*').order('sort_order')
       const { data: tLogs } = await supabase.from('workout_logs').select('*').eq('logged_date', today)
-     const { data: lwLogs } = await supabase.from('workout_logs').select('*').gte('logged_date', lastWeekStart).lte('logged_date', lastWeekEnd)
+    const { data: lwLogs } = await supabase.from('workout_logs').select('*').lt('logged_date', today).order('logged_date', { ascending: false }).limit(200)
       const { data: allLogs } = await supabase.from('workout_logs').select('*').order('logged_date')
 
       const exerciseMap = {}
@@ -732,7 +731,11 @@ const lastWeekEnd = new Date(Date.now() - 1 * 86400000).toISOString().split('T')
 
       setPrograms(progs?.map(p => ({ ...p, exercises: topLevel.filter(e => e.program_id === p.id) })) || [])
       const tMap = {}; tLogs?.forEach(l => { tMap[l.exercise_id] = l }); setTodayLogs(tMap)
-      const lwMap = {}; lwLogs?.forEach(l => { lwMap[l.exercise_id] = l }); setLastWeekLogs(lwMap)
+      // Keep only the most recent log per exercise (newest first, so first one wins)
+const lwMap = {}
+lwLogs?.forEach(l => {
+  if (!lwMap[l.exercise_id]) lwMap[l.exercise_id] = l
+})
 
       // Build chart data map keyed by string exercise_id
       const cMap = {}
