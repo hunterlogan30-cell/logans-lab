@@ -758,15 +758,32 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   })()
 
   const handleLogChange = async (exId, field, value) => {
-    setTodayLogs(prev => ({ ...prev, [exId]: { ...(prev[exId] || {}), [field]: value, exercise_id: exId } }))
-    const existing = todayLogs[exId]
-    if (existing?.id) {
-      await supabase.from('workout_logs').update({ [field]: value }).eq('id', existing.id)
-    } else {
-      const { data } = await supabase.from('workout_logs').insert({ exercise_id: exId, logged_date: today, [field]: value }).select().single()
-      if (data) setTodayLogs(prev => ({ ...prev, [exId]: data }))
+  setTodayLogs(prev => ({ ...prev, [exId]: { ...(prev[exId] || {}), [field]: value, exercise_id: exId } }))
+  const existing = todayLogs[exId]
+  if (existing?.id) {
+    await supabase.from('workout_logs').update({ [field]: value }).eq('id', existing.id)
+  } else {
+    const { data } = await supabase.from('workout_logs').insert({ exercise_id: exId, logged_date: today, [field]: value }).select().single()
+    if (data) setTodayLogs(prev => ({ ...prev, [exId]: data }))
+  }
+
+  // When marking done, if weight was logged today, add it to the chart immediately
+  if (field === 'done' && value === true) {
+    const log = todayLogs[exId] || {}
+    const weight = log.weight_used || (existing?.weight_used)
+    if (weight && parseFloat(weight) > 0) {
+      const label = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      setChartDataMap(prev => {
+        const key = String(exId)
+        const existing = prev[key] || []
+        // Don't duplicate if today's entry already exists
+        const alreadyToday = existing.some(e => e.label === label)
+        if (alreadyToday) return prev
+        return { ...prev, [key]: [...existing, { label, value: weight }] }
+      })
     }
   }
+}
 
   const startRest = (secs) => {
     const adjusted = getRecommendedRest(secs, recoveryScore)
