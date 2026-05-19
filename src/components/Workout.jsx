@@ -220,8 +220,8 @@ function ProgressChart({ data, unit = 'lbs' }) {
   const [tooltip, setTooltip] = useState(null)
   const PAD = { L: 44, R: 12, T: 16, B: 36 }
 
-  const getPoints = (W, H) => {
-    if (!data || data.length < 2) return []
+  cconst getPoints = (W, H) => {
+  if (!data || data.length < 1) return []
     const chartW = W - PAD.L - PAD.R
     const chartH = H - PAD.T - PAD.B
     const vals = data.map(d => parseFloat(d.value) || 0)
@@ -258,7 +258,20 @@ function ProgressChart({ data, unit = 'lbs' }) {
     const chartH = H - PAD.T - PAD.B
     const pts = getPoints(W, H)
     ctx.clearRect(0, 0, W, H)
-    if (pts.length < 2) return
+    if (pts.length < 1) return
+if (pts.length === 1) {
+  // Single point — just draw a dot and label
+  const p = pts[0]
+  ctx.beginPath()
+  ctx.arc(p.x, p.y, 5, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'
+  ctx.fill()
+  ctx.textAlign = 'center'
+  ctx.font = '10px Inter, sans-serif'
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'
+  ctx.fillText(p.label, p.x, PAD.T + (canvas.height / dprRef.current - PAD.T - PAD.B) + PAD.T + 18)
+  return
+}
     const vals = data.map(d => parseFloat(d.value) || 0)
     const minV = Math.max(0, Math.min(...vals) * 0.97)
     const maxV = Math.max(...vals) * 1.03 || 100
@@ -547,7 +560,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
           {isChartOpen && (
             <div style={{ marginTop: '10px', padding: '14px', background: 'rgba(255,255,255,0.04)', borderRadius: '12px' }}>
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px' }}>Weight over time (lbs)</p>
-              {chartData && chartData.length >= 2 ? <ProgressChart data={chartData} unit="lbs" /> : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>Log 2+ sessions to see your chart.</p>}
+              {chartData && chartData.length >= 1 ? <ProgressChart data={chartData} unit="lbs" /> : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>Log a session to start your chart.</p>}
             </div>
           )}
         </div>
