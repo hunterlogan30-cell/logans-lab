@@ -578,8 +578,8 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
               todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
               onEdit={onEdit} onAddVariant={onAddVariant}
               allCharts={allCharts} setAllCharts={setAllCharts}
-              onLogChange={onLogChange} chartData={chartData}
-              onStartRest={onStartRest} />
+              onLogChange={onLogChange} chartData={chartData[String(v.id)]}
+onStartRest={onStartRest} />
           ))}
         </div>
       )}
@@ -715,8 +715,6 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
         cMap[l.exercise_id].push({ label: new Date(l.logged_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: l.weight_used })
       })
       setChartData(cMap)
-      console.log('chartData keys:', Object.keys(cMap))
-console.log('chartData:', cMap)
     } catch(e) { console.error(e) }
     setLoading(false)
   }
