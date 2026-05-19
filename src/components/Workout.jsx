@@ -702,7 +702,8 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   const [exForm, setExForm] = useState({ name: '', sets: '', reps: '', weight: '', notes: '', rest_seconds: '90' })
 
   const today = new Date().toISOString().split('T')[0]
-  const lastWeek = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
+  const lastWeekStart = new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0]
+const lastWeekEnd = new Date(Date.now() - 1 * 86400000).toISOString().split('T')[0]
 
   useEffect(() => {
     const handler = () => setWide(window.innerWidth >= 768)
@@ -718,7 +719,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
       const { data: progs } = await supabase.from('programs').select('*').order('id')
       const { data: exs } = await supabase.from('exercises').select('*').order('sort_order')
       const { data: tLogs } = await supabase.from('workout_logs').select('*').eq('logged_date', today)
-      const { data: lwLogs } = await supabase.from('workout_logs').select('*').eq('logged_date', lastWeek)
+     const { data: lwLogs } = await supabase.from('workout_logs').select('*').gte('logged_date', lastWeekStart).lte('logged_date', lastWeekEnd)
       const { data: allLogs } = await supabase.from('workout_logs').select('*').order('logged_date')
 
       const exerciseMap = {}
