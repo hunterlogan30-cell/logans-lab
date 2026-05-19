@@ -220,7 +220,7 @@ function ProgressChart({ data, unit = 'lbs' }) {
   const [tooltip, setTooltip] = useState(null)
   const PAD = { L: 44, R: 12, T: 16, B: 36 }
 
-  cconst getPoints = (W, H) => {
+ const getPoints = (W, H) => {
   if (!data || data.length < 1) return []
     const chartW = W - PAD.L - PAD.R
     const chartH = H - PAD.T - PAD.B
