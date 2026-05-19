@@ -715,6 +715,8 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
         cMap[l.exercise_id].push({ label: new Date(l.logged_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: l.weight_used })
       })
       setChartData(cMap)
+      console.log('chartData keys:', Object.keys(cMap))
+console.log('chartData:', cMap)
     } catch(e) { console.error(e) }
     setLoading(false)
   }
