@@ -213,6 +213,7 @@ function RestTimer({ restSeconds, onDismiss }) {
   )
 }
 
+// ── ProgressChart — accepts a resolved array of {label, value} ──
 function ProgressChart({ data, unit = 'lbs' }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
@@ -220,8 +221,8 @@ function ProgressChart({ data, unit = 'lbs' }) {
   const [tooltip, setTooltip] = useState(null)
   const PAD = { L: 44, R: 12, T: 16, B: 36 }
 
- const getPoints = (W, H) => {
-  if (!data || data.length < 1) return []
+  const getPoints = (W, H) => {
+    if (!data || data.length < 1) return []
     const chartW = W - PAD.L - PAD.R
     const chartH = H - PAD.T - PAD.B
     const vals = data.map(d => parseFloat(d.value) || 0)
@@ -258,23 +259,28 @@ function ProgressChart({ data, unit = 'lbs' }) {
     const chartH = H - PAD.T - PAD.B
     const pts = getPoints(W, H)
     ctx.clearRect(0, 0, W, H)
-    if (pts.length < 1) return
-if (pts.length === 1) {
-  // Single point — just draw a dot and label
-  const p = pts[0]
-  ctx.beginPath()
-  ctx.arc(p.x, p.y, 5, 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(255,255,255,0.6)'
-  ctx.fill()
-  ctx.textAlign = 'center'
-  ctx.font = '10px Inter, sans-serif'
-  ctx.fillStyle = 'rgba(255,255,255,0.4)'
-  ctx.fillText(p.label, p.x, PAD.T + (canvas.height / dprRef.current - PAD.T - PAD.B) + PAD.T + 18)
-  return
-}
+
+    if (pts.length === 0) return
+
+    // Single point — dot + label only
+    if (pts.length === 1) {
+      const p = pts[0]
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(255,255,255,0.6)'
+      ctx.fill()
+      ctx.textAlign = 'center'
+      ctx.font = '10px Inter, sans-serif'
+      ctx.fillStyle = 'rgba(255,255,255,0.4)'
+      ctx.fillText(p.label, p.x, PAD.T + chartH + 18)
+      return
+    }
+
     const vals = data.map(d => parseFloat(d.value) || 0)
     const minV = Math.max(0, Math.min(...vals) * 0.97)
     const maxV = Math.max(...vals) * 1.03 || 100
+
+    // Y grid
     ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'right'
     ;[0, 0.5, 1].forEach(pct => {
       const v = (minV + pct * (maxV - minV)).toFixed(1)
@@ -283,23 +289,33 @@ if (pts.length === 1) {
       ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.setLineDash([3,3])
       ctx.beginPath(); ctx.moveTo(PAD.L, y); ctx.lineTo(W - PAD.R, y); ctx.stroke(); ctx.setLineDash([])
     })
+
+    // Area fill
     const grad = ctx.createLinearGradient(0, PAD.T, 0, PAD.T + chartH)
     grad.addColorStop(0, 'rgba(99,102,241,0.35)'); grad.addColorStop(1, 'rgba(99,102,241,0)')
     ctx.beginPath(); ctx.moveTo(pts[0].x, PAD.T + chartH)
     pts.forEach(p => ctx.lineTo(p.x, p.y))
     ctx.lineTo(pts[pts.length-1].x, PAD.T + chartH); ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
+
+    // Line
     ctx.beginPath(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round'
     pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)); ctx.stroke()
+
+    // X labels
     ctx.textAlign = 'center'; ctx.font = '10px Inter, sans-serif'
     pts.forEach(p => {
       ctx.fillStyle = p.idx === hiIdx ? '#fff' : 'rgba(255,255,255,0.4)'
       ctx.fillText(p.label, p.x, PAD.T + chartH + 18)
     })
+
+    // Dots
     pts.forEach(p => {
       const hi = p.idx === hiIdx
       if (hi) { ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill() }
       ctx.beginPath(); ctx.arc(p.x, p.y, hi ? 5 : 3, 0, Math.PI*2); ctx.fillStyle = hi ? '#fff' : 'rgba(255,255,255,0.6)'; ctx.fill()
     })
+
+    // Vertical dashed line
     if (hiIdx !== null && pts[hiIdx]) {
       const p = pts[hiIdx]
       ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([3,3])
@@ -410,7 +426,7 @@ function BodyWeightSection() {
           <button onClick={save} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : todayLog ? 'Update' : 'Log weight'}</button>
         </div>
 
-        {logs.length >= 2 && (
+        {logs.length >= 1 && (
           <div style={{ ...glass, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Progress</h3>
@@ -420,7 +436,7 @@ function BodyWeightSection() {
                 ))}
               </div>
             </div>
-            {chartData.length >= 2 ? <ProgressChart data={chartData} unit="lbs" /> : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '20px 0' }}>Log more days to see your chart.</p>}
+            {chartData.length >= 1 ? <ProgressChart data={chartData} unit="lbs" /> : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '20px 0' }}>No data for this range.</p>}
             {filtered.length >= 2 && (() => {
               const vals = filtered.map(l => parseFloat(l.weight_lbs))
               const total = (vals[vals.length-1] - vals[0]).toFixed(1)
@@ -465,7 +481,8 @@ function BodyWeightSection() {
   )
 }
 
-function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, onStartRest, dragHandleProps }) {
+// ── ExerciseRow — chartDataMap is the full {exercise_id: []} map ──
+function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartDataMap, onStartRest, dragHandleProps }) {
   const [expanded, setExpanded] = useState(false)
   const [variantsOpen, setVariantsOpen] = useState(false)
   const exLog = todayLogs[ex.id] || {}
@@ -479,6 +496,9 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
 
   const chartKey = `${ex.id}`
   const isChartOpen = allCharts === chartKey
+
+  // Resolve this exercise's chart data from the map
+  const myChartData = chartDataMap[String(ex.id)] || chartDataMap[ex.id] || []
 
   return (
     <div style={{ borderRadius: isVariant ? '14px' : '18px', background: exLog.done ? 'rgba(16,185,129,0.08)' : isVariant ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)', border: `1px solid ${exLog.done ? 'rgba(16,185,129,0.25)' : isVariant ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.15)'}`, overflow: 'hidden', transition: 'background 0.2s, border 0.2s' }}>
@@ -560,7 +580,10 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
           {isChartOpen && (
             <div style={{ marginTop: '10px', padding: '14px', background: 'rgba(255,255,255,0.04)', borderRadius: '12px' }}>
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px' }}>Weight over time (lbs)</p>
-              {chartData && chartData.length >= 1 ? <ProgressChart data={chartData} unit="lbs" /> : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>Log a session to start your chart.</p>}
+              {myChartData.length >= 1
+                ? <ProgressChart data={myChartData} unit="lbs" />
+                : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>Log a weight to see your progress.</p>
+              }
             </div>
           )}
         </div>
@@ -578,8 +601,8 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
               todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
               onEdit={onEdit} onAddVariant={onAddVariant}
               allCharts={allCharts} setAllCharts={setAllCharts}
-              onLogChange={onLogChange} chartData={chartData[String(v.id)]}
-onStartRest={onStartRest} />
+              onLogChange={onLogChange} chartDataMap={chartDataMap}
+              onStartRest={onStartRest} />
           ))}
         </div>
       )}
@@ -587,7 +610,8 @@ onStartRest={onStartRest} />
   )
 }
 
-function SortableExerciseList({ exercises, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartData, onReorder, onStartRest }) {
+// ── SortableExerciseList — passes the full chartDataMap down ──
+function SortableExerciseList({ exercises, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartDataMap, onReorder, onStartRest }) {
   const [items, setItems] = useState(exercises)
   const [draggingIdx, setDraggingIdx] = useState(null)
   const listRef = useRef(null)
@@ -645,7 +669,7 @@ function SortableExerciseList({ exercises, todayLogs, lastWeekLogs, onEdit, onAd
         >
           <ExerciseRow ex={ex} todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
             onEdit={onEdit} onAddVariant={onAddVariant} allCharts={allCharts}
-            setAllCharts={setAllCharts} onLogChange={onLogChange} chartData={chartData[ex.id] || chartData[String(ex.id)]}
+            setAllCharts={setAllCharts} onLogChange={onLogChange} chartDataMap={chartDataMap}
             onStartRest={onStartRest}
             dragHandleProps={{
               onTouchStart: e => onTouchStart(e, i), onTouchMove, onTouchEnd,
@@ -663,7 +687,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   const [programs, setPrograms] = useState([])
   const [todayLogs, setTodayLogs] = useState({})
   const [lastWeekLogs, setLastWeekLogs] = useState({})
-  const [chartData, setChartData] = useState({})
+  const [chartDataMap, setChartDataMap] = useState({})
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
   const [allCharts, setAllCharts] = useState(null)
@@ -708,13 +732,19 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
       setPrograms(progs?.map(p => ({ ...p, exercises: topLevel.filter(e => e.program_id === p.id) })) || [])
       const tMap = {}; tLogs?.forEach(l => { tMap[l.exercise_id] = l }); setTodayLogs(tMap)
       const lwMap = {}; lwLogs?.forEach(l => { lwMap[l.exercise_id] = l }); setLastWeekLogs(lwMap)
+
+      // Build chart data map keyed by string exercise_id
       const cMap = {}
       allLogs?.forEach(l => {
         if (!l.weight_used || parseFloat(l.weight_used) <= 0) return
-        if (!cMap[l.exercise_id]) cMap[l.exercise_id] = []
-        cMap[l.exercise_id].push({ label: new Date(l.logged_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: l.weight_used })
+        const key = String(l.exercise_id)
+        if (!cMap[key]) cMap[key] = []
+        cMap[key].push({
+          label: new Date(l.logged_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          value: l.weight_used
+        })
       })
-      setChartData(cMap)
+      setChartDataMap(cMap)
     } catch(e) { console.error(e) }
     setLoading(false)
   }
@@ -872,7 +902,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
               <SortableExerciseList
                 exercises={prog.exercises} todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
                 onEdit={openEditEx} onAddVariant={openAddVariant} allCharts={allCharts}
-                setAllCharts={setAllCharts} onLogChange={handleLogChange} chartData={chartData}
+                setAllCharts={setAllCharts} onLogChange={handleLogChange} chartDataMap={chartDataMap}
                 onReorder={handleReorder} onStartRest={startRest}
               />
 
