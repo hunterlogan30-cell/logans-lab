@@ -213,7 +213,6 @@ function RestTimer({ restSeconds, onDismiss }) {
   )
 }
 
-// ── ProgressChart — accepts a resolved array of {label, value} ──
 function ProgressChart({ data, unit = 'lbs' }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
@@ -262,7 +261,6 @@ function ProgressChart({ data, unit = 'lbs' }) {
 
     if (pts.length === 0) return
 
-    // Single point — dot + label only
     if (pts.length === 1) {
       const p = pts[0]
       ctx.beginPath()
@@ -280,7 +278,6 @@ function ProgressChart({ data, unit = 'lbs' }) {
     const minV = Math.max(0, Math.min(...vals) * 0.97)
     const maxV = Math.max(...vals) * 1.03 || 100
 
-    // Y grid
     ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'right'
     ;[0, 0.5, 1].forEach(pct => {
       const v = (minV + pct * (maxV - minV)).toFixed(1)
@@ -290,32 +287,27 @@ function ProgressChart({ data, unit = 'lbs' }) {
       ctx.beginPath(); ctx.moveTo(PAD.L, y); ctx.lineTo(W - PAD.R, y); ctx.stroke(); ctx.setLineDash([])
     })
 
-    // Area fill
     const grad = ctx.createLinearGradient(0, PAD.T, 0, PAD.T + chartH)
     grad.addColorStop(0, 'rgba(99,102,241,0.35)'); grad.addColorStop(1, 'rgba(99,102,241,0)')
     ctx.beginPath(); ctx.moveTo(pts[0].x, PAD.T + chartH)
     pts.forEach(p => ctx.lineTo(p.x, p.y))
     ctx.lineTo(pts[pts.length-1].x, PAD.T + chartH); ctx.closePath(); ctx.fillStyle = grad; ctx.fill()
 
-    // Line
     ctx.beginPath(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round'
     pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)); ctx.stroke()
 
-    // X labels
     ctx.textAlign = 'center'; ctx.font = '10px Inter, sans-serif'
     pts.forEach(p => {
       ctx.fillStyle = p.idx === hiIdx ? '#fff' : 'rgba(255,255,255,0.4)'
       ctx.fillText(p.label, p.x, PAD.T + chartH + 18)
     })
 
-    // Dots
     pts.forEach(p => {
       const hi = p.idx === hiIdx
       if (hi) { ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill() }
       ctx.beginPath(); ctx.arc(p.x, p.y, hi ? 5 : 3, 0, Math.PI*2); ctx.fillStyle = hi ? '#fff' : 'rgba(255,255,255,0.6)'; ctx.fill()
     })
 
-    // Vertical dashed line
     if (hiIdx !== null && pts[hiIdx]) {
       const p = pts[hiIdx]
       ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([3,3])
@@ -481,10 +473,10 @@ function BodyWeightSection() {
   )
 }
 
-// ── ExerciseRow — chartDataMap is the full {exercise_id: []} map ──
 function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartDataMap, onStartRest, dragHandleProps }) {
   const [expanded, setExpanded] = useState(false)
   const [variantsOpen, setVariantsOpen] = useState(false)
+  const [setLogged, setSetLogged] = useState(false)
   const exLog = todayLogs[ex.id] || {}
   const lwLog = lastWeekLogs[ex.id] || {}
 
@@ -496,9 +488,19 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
 
   const chartKey = `${ex.id}`
   const isChartOpen = allCharts === chartKey
-
-  // Resolve this exercise's chart data from the map
   const myChartData = chartDataMap[String(ex.id)] || chartDataMap[ex.id] || []
+
+  const hasWeight = !!(exLog.weight_used && String(exLog.weight_used).trim() !== '')
+  const hasReps = !!(exLog.reps_done && String(exLog.reps_done).trim() !== '')
+  const canLog = hasWeight && hasReps
+
+  const handleLogSet = () => {
+    if (!canLog) return
+    onLogChange(ex.id, 'weight_used', exLog.weight_used)
+    onLogChange(ex.id, 'reps_done', exLog.reps_done)
+    setSetLogged(true)
+    setTimeout(() => setSetLogged(false), 2000)
+  }
 
   return (
     <div style={{ borderRadius: isVariant ? '14px' : '18px', background: exLog.done ? 'rgba(16,185,129,0.08)' : isVariant ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)', border: `1px solid ${exLog.done ? 'rgba(16,185,129,0.25)' : isVariant ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.15)'}`, overflow: 'hidden', transition: 'background 0.2s, border 0.2s' }}>
@@ -549,7 +551,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px', padding: '8px 12px', borderRadius: '10px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(199,200,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               <span style={{ fontSize: '12px', color: 'rgba(199,200,255,0.7)' }}>
-               Last workout: <strong style={{ color: '#fff' }}>{lwLog.weight_used ? `${lwLog.weight_used} lbs` : ''}{lwLog.weight_used && lwLog.reps_done ? ' · ' : ''}{lwLog.reps_done ? `${lwLog.reps_done} reps` : ''}</strong>
+                Last workout: <strong style={{ color: '#fff' }}>{lwLog.weight_used ? `${lwLog.weight_used} lbs` : ''}{lwLog.weight_used && lwLog.reps_done ? ' · ' : ''}{lwLog.reps_done ? `${lwLog.reps_done} reps` : ''}</strong>
               </span>
             </div>
           )}
@@ -567,23 +569,29 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
                 style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '10px 12px', color: '#fff', fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box' }} />
             </div>
           </div>
+
+          {/* Log Set button */}
           <button
-  onClick={() => {
-    const w = exLog.weight_used
-    const r = exLog.reps_done
-    if (!w || !r) return
-    if (w) onLogChange(ex.id, 'weight_used', w)
-    if (r) onLogChange(ex.id, 'reps_done', r)
-    setSetLogged(true)
-    setTimeout(() => setSetLogged(false), 2000)
-  }}
-  disabled={!exLog.weight_used || !exLog.reps_done}
-  style={{ width: '100%', padding: '10px', borderRadius: '10px', cursor: (!exLog.weight_used || !exLog.reps_done) ? 'not-allowed' : 'pointer', background: setLogged ? 'rgba(16,185,129,0.2)' : 'linear-gradient(135deg, #10B981, #059669)', border: setLogged ? '1px solid rgba(16,185,129,0.4)' : 'none', color: '#fff', fontSize: '13px', fontWeight: '600', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px', opacity: (!exLog.weight_used || !exLog.reps_done) ? 0.4 : 1, transition: 'all 0.3s' }}>
-  {setLogged
-    ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span style={{ color: '#10B981' }}>Set Logged</span></>
-    : 'Log Set'
-  }
-</button>
+            onClick={handleLogSet}
+            disabled={!canLog}
+            style={{
+              width: '100%', padding: '11px', borderRadius: '10px',
+              cursor: canLog ? 'pointer' : 'not-allowed',
+              background: setLogged ? 'rgba(16,185,129,0.15)' : canLog ? 'linear-gradient(135deg, #10B981, #059669)' : 'rgba(255,255,255,0.06)',
+              border: setLogged ? '1px solid rgba(16,185,129,0.4)' : canLog ? 'none' : '1px solid rgba(255,255,255,0.1)',
+              color: setLogged ? '#10B981' : '#fff',
+              fontSize: '13px', fontWeight: '600', fontFamily: 'Inter, sans-serif',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              marginBottom: '8px', opacity: !canLog ? 0.4 : 1, transition: 'all 0.3s'
+            }}>
+            {setLogged ? (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Set Logged
+              </>
+            ) : 'Log Set'}
+          </button>
+
           <button onClick={() => onStartRest(ex.rest_seconds || 90)} style={{ width: '100%', padding: '8px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'rgba(199,200,255,0.8)', fontSize: '12px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             Start rest timer ({ex.rest_seconds || 90}s)
@@ -597,7 +605,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '10px' }}>Weight over time (lbs)</p>
               {myChartData.length >= 1
                 ? <ProgressChart data={myChartData} unit="lbs" />
-                : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>Log a weight to see your progress.</p>
+                : <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>Log a set to see your progress.</p>
               }
             </div>
           )}
@@ -612,7 +620,6 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             <div style={{ height: '1px', flex: 1, background: 'rgba(255,255,255,0.08)' }} />
           </div>
           {ex.variants.map(v => (
-            const [variantsOpen, setVariantsOpen] = useState(false)
             <ExerciseRow key={v.id} ex={v} isVariant
               todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
               onEdit={onEdit} onAddVariant={onAddVariant}
@@ -626,7 +633,6 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
   )
 }
 
-// ── SortableExerciseList — passes the full chartDataMap down ──
 function SortableExerciseList({ exercises, todayLogs, lastWeekLogs, onEdit, onAddVariant, allCharts, setAllCharts, onLogChange, chartDataMap, onReorder, onStartRest }) {
   const [items, setItems] = useState(exercises)
   const [draggingIdx, setDraggingIdx] = useState(null)
@@ -718,7 +724,6 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   const [exForm, setExForm] = useState({ name: '', sets: '', reps: '', weight: '', notes: '', rest_seconds: '90' })
 
   const today = new Date().toISOString().split('T')[0]
- const lastWorkoutDate = new Date(Date.now() - 1 * 86400000).toISOString().split('T')[0]
 
   useEffect(() => {
     const handler = () => setWide(window.innerWidth >= 768)
@@ -734,7 +739,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
       const { data: progs } = await supabase.from('programs').select('*').order('id')
       const { data: exs } = await supabase.from('exercises').select('*').order('sort_order')
       const { data: tLogs } = await supabase.from('workout_logs').select('*').eq('logged_date', today)
-    const { data: lwLogs } = await supabase.from('workout_logs').select('*').lt('logged_date', today).order('logged_date', { ascending: false }).limit(200)
+      const { data: lwLogs } = await supabase.from('workout_logs').select('*').lt('logged_date', today).order('logged_date', { ascending: false }).limit(200)
       const { data: allLogs } = await supabase.from('workout_logs').select('*').order('logged_date')
 
       const exerciseMap = {}
@@ -746,14 +751,19 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
       })
 
       setPrograms(progs?.map(p => ({ ...p, exercises: topLevel.filter(e => e.program_id === p.id) })) || [])
-      const tMap = {}; tLogs?.forEach(l => { tMap[l.exercise_id] = l }); setTodayLogs(tMap)
-      // Keep only the most recent log per exercise (newest first, so first one wins)
-const lwMap = {}
-lwLogs?.forEach(l => {
-  if (!lwMap[l.exercise_id]) lwMap[l.exercise_id] = l
-})
 
-      // Build chart data map keyed by string exercise_id
+      const tMap = {}
+      tLogs?.forEach(l => { tMap[l.exercise_id] = l })
+      setTodayLogs(tMap)
+
+      // Last workout: most recent log per exercise before today
+      const lwMap = {}
+      lwLogs?.forEach(l => {
+        if (!lwMap[l.exercise_id]) lwMap[l.exercise_id] = l
+      })
+      setLastWeekLogs(lwMap)
+
+      // Chart data map keyed by string exercise_id
       const cMap = {}
       allLogs?.forEach(l => {
         if (!l.weight_used || parseFloat(l.weight_used) <= 0) return
@@ -778,32 +788,31 @@ lwLogs?.forEach(l => {
   })()
 
   const handleLogChange = async (exId, field, value) => {
-  setTodayLogs(prev => ({ ...prev, [exId]: { ...(prev[exId] || {}), [field]: value, exercise_id: exId } }))
-  const existing = todayLogs[exId]
-  if (existing?.id) {
-    await supabase.from('workout_logs').update({ [field]: value }).eq('id', existing.id)
-  } else {
-    const { data } = await supabase.from('workout_logs').insert({ exercise_id: exId, logged_date: today, [field]: value }).select().single()
-    if (data) setTodayLogs(prev => ({ ...prev, [exId]: data }))
-  }
+    setTodayLogs(prev => ({ ...prev, [exId]: { ...(prev[exId] || {}), [field]: value, exercise_id: exId } }))
+    const existing = todayLogs[exId]
+    if (existing?.id) {
+      await supabase.from('workout_logs').update({ [field]: value }).eq('id', existing.id)
+    } else {
+      const { data } = await supabase.from('workout_logs').insert({ exercise_id: exId, logged_date: today, [field]: value }).select().single()
+      if (data) setTodayLogs(prev => ({ ...prev, [exId]: data }))
+    }
 
-  // When marking done, if weight was logged today, add it to the chart immediately
-  if (field === 'done' && value === true) {
-    const log = todayLogs[exId] || {}
-    const weight = log.weight_used || (existing?.weight_used)
-    if (weight && parseFloat(weight) > 0) {
-      const label = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      setChartDataMap(prev => {
-        const key = String(exId)
-        const existing = prev[key] || []
-        // Don't duplicate if today's entry already exists
-        const alreadyToday = existing.some(e => e.label === label)
-        if (alreadyToday) return prev
-        return { ...prev, [key]: [...existing, { label, value: weight }] }
-      })
+    // When marking done, add weight to chart immediately
+    if (field === 'done' && value === true) {
+      const log = { ...todayLogs[exId], [field]: value }
+      const weight = log.weight_used
+      if (weight && parseFloat(weight) > 0) {
+        const label = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        setChartDataMap(prev => {
+          const key = String(exId)
+          const arr = prev[key] || []
+          const alreadyToday = arr.some(e => e.label === label)
+          if (alreadyToday) return prev
+          return { ...prev, [key]: [...arr, { label, value: weight }] }
+        })
+      }
     }
   }
-}
 
   const startRest = (secs) => {
     const adjusted = getRecommendedRest(secs, recoveryScore)
