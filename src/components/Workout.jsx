@@ -558,17 +558,24 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
               <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '5px' }}>Weight (lbs)</label>
               <input type="number" placeholder={ex.weight || '0'} value={exLog.weight_used || ''}
                 onChange={e => onLogChange(ex.id, 'weight_used', e.target.value)}
-                onBlur={e => onLogChange(ex.id, 'weight_used', e.target.value)}
                 style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '10px 12px', color: '#fff', fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box' }} />
             </div>
             <div>
               <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '5px' }}>Reps done</label>
               <input type="text" placeholder={ex.reps} value={exLog.reps_done || ''}
                 onChange={e => onLogChange(ex.id, 'reps_done', e.target.value)}
-                onBlur={e => onLogChange(ex.id, 'reps_done', e.target.value)}
                 style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '10px 12px', color: '#fff', fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box' }} />
             </div>
           </div>
+          <button onClick={() => {
+  const w = exLog.weight_used
+  const r = exLog.reps_done
+  if (w) onLogChange(ex.id, 'weight_used', w)
+  if (r) onLogChange(ex.id, 'reps_done', r)
+}} style={{ width: '100%', padding: '10px', borderRadius: '10px', cursor: 'pointer', background: 'linear-gradient(135deg, #10B981, #059669)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: '600', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+  Log set
+</button>
           <button onClick={() => onStartRest(ex.rest_seconds || 90)} style={{ width: '100%', padding: '8px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'rgba(199,200,255,0.8)', fontSize: '12px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             Start rest timer ({ex.rest_seconds || 90}s)
