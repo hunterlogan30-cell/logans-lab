@@ -567,14 +567,22 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
                 style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '10px 12px', color: '#fff', fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box' }} />
             </div>
           </div>
-          <button onClick={() => {
-  const w = exLog.weight_used
-  const r = exLog.reps_done
-  if (w) onLogChange(ex.id, 'weight_used', w)
-  if (r) onLogChange(ex.id, 'reps_done', r)
-}} style={{ width: '100%', padding: '10px', borderRadius: '10px', cursor: 'pointer', background: 'linear-gradient(135deg, #10B981, #059669)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: '600', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-  Log set
+          <button
+  onClick={() => {
+    const w = exLog.weight_used
+    const r = exLog.reps_done
+    if (!w || !r) return
+    if (w) onLogChange(ex.id, 'weight_used', w)
+    if (r) onLogChange(ex.id, 'reps_done', r)
+    setSetLogged(true)
+    setTimeout(() => setSetLogged(false), 2000)
+  }}
+  disabled={!exLog.weight_used || !exLog.reps_done}
+  style={{ width: '100%', padding: '10px', borderRadius: '10px', cursor: (!exLog.weight_used || !exLog.reps_done) ? 'not-allowed' : 'pointer', background: setLogged ? 'rgba(16,185,129,0.2)' : 'linear-gradient(135deg, #10B981, #059669)', border: setLogged ? '1px solid rgba(16,185,129,0.4)' : 'none', color: '#fff', fontSize: '13px', fontWeight: '600', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px', opacity: (!exLog.weight_used || !exLog.reps_done) ? 0.4 : 1, transition: 'all 0.3s' }}>
+  {setLogged
+    ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span style={{ color: '#10B981' }}>Set Logged</span></>
+    : 'Log Set'
+  }
 </button>
           <button onClick={() => onStartRest(ex.rest_seconds || 90)} style={{ width: '100%', padding: '8px', borderRadius: '10px', cursor: 'pointer', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'rgba(199,200,255,0.8)', fontSize: '12px', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -604,6 +612,7 @@ function ExerciseRow({ ex, isVariant = false, todayLogs, lastWeekLogs, onEdit, o
             <div style={{ height: '1px', flex: 1, background: 'rgba(255,255,255,0.08)' }} />
           </div>
           {ex.variants.map(v => (
+            const [variantsOpen, setVariantsOpen] = useState(false)
             <ExerciseRow key={v.id} ex={v} isVariant
               todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
               onEdit={onEdit} onAddVariant={onAddVariant}
