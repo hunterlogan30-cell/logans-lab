@@ -41,7 +41,6 @@ const getRecommendedRest = (base, recovery) => {
 
 const TODAY = new Date().toISOString().split('T')[0]
 
-// ─── Icons ────────────────────────────────────────────────────────────────────
 const ChevronRight = ({ color = GRAY }) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
 )
@@ -67,8 +66,7 @@ const ArrowIcon = ({ color = '#111' }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
 )
 
-// ─── Progress Border Card ─────────────────────────────────────────────────────
-// Uses a canvas-drawn border that animates around the outside of the card
+// ─── Progress Border Card (canvas) ───────────────────────────────────────────
 function ProgressBorderCard({ pct, children }) {
   const canvasRef = useRef(null)
 
@@ -78,70 +76,62 @@ function ProgressBorderCard({ pct, children }) {
     const dpr = window.devicePixelRatio || 1
     const W = canvas.offsetWidth
     const H = canvas.offsetHeight
+    if (!W || !H) return
     canvas.width = W * dpr
     canvas.height = H * dpr
     const ctx = canvas.getContext('2d')
     ctx.scale(dpr, dpr)
+    ctx.clearRect(0, 0, W, H)
 
     const r = 20
     const lw = 3
     const half = lw / 2
 
-    // Total perimeter of rounded rect
-    const perimeter = 2 * (W - 2*r) + 2 * (H - 2*r) + 2 * Math.PI * r
+    const roundedRect = () => {
+      ctx.beginPath()
+      ctx.moveTo(r + half, half)
+      ctx.lineTo(W - r - half, half)
+      ctx.arcTo(W - half, half, W - half, r + half, r)
+      ctx.lineTo(W - half, H - r - half)
+      ctx.arcTo(W - half, H - half, W - r - half, H - half, r)
+      ctx.lineTo(r + half, H - half)
+      ctx.arcTo(half, H - half, half, H - r - half, r)
+      ctx.lineTo(half, r + half)
+      ctx.arcTo(half, half, r + half, half, r)
+      ctx.closePath()
+    }
 
-    // Draw background border
-    ctx.beginPath()
-    ctx.moveTo(r + half, half)
-    ctx.lineTo(W - r - half, half)
-    ctx.arcTo(W - half, half, W - half, r + half, r)
-    ctx.lineTo(W - half, H - r - half)
-    ctx.arcTo(W - half, H - half, W - r - half, H - half, r)
-    ctx.lineTo(r + half, H - half)
-    ctx.arcTo(half, H - half, half, H - r - half, r)
-    ctx.lineTo(half, r + half)
-    ctx.arcTo(half, half, r + half, half, r)
+    // background border
+    roundedRect()
     ctx.strokeStyle = BORDER
     ctx.lineWidth = lw
     ctx.stroke()
 
-    if (pct <= 0) return
-
-    // Draw progress border
-    const progressLen = perimeter * (pct / 100)
-    ctx.beginPath()
-    ctx.moveTo(r + half, half)
-    ctx.lineTo(W - r - half, half)
-    ctx.arcTo(W - half, half, W - half, r + half, r)
-    ctx.lineTo(W - half, H - r - half)
-    ctx.arcTo(W - half, H - half, W - r - half, H - half, r)
-    ctx.lineTo(r + half, H - half)
-    ctx.arcTo(half, H - half, half, H - r - half, r)
-    ctx.lineTo(half, r + half)
-    ctx.arcTo(half, half, r + half, half, r)
-    ctx.strokeStyle = WHITE
-    ctx.lineWidth = lw
-    ctx.lineCap = 'round'
-    ctx.setLineDash([progressLen, perimeter])
-    ctx.stroke()
-    ctx.setLineDash([])
+    if (pct > 0) {
+      const perimeter = 2 * (W - 2*r) + 2 * (H - 2*r) + 2 * Math.PI * r
+      const progressLen = perimeter * (pct / 100)
+      roundedRect()
+      ctx.strokeStyle = WHITE
+      ctx.lineWidth = lw
+      ctx.lineCap = 'round'
+      ctx.setLineDash([progressLen, perimeter])
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
   }, [pct])
 
   return (
     <div style={{ position: 'relative', borderRadius: '20px', background: CARD, marginBottom: '28px' }}>
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', borderRadius: '20px', pointerEvents: 'none', zIndex: 2 }}/>
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        {children}
-      </div>
+      <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
     </div>
   )
 }
 
 // ─── Week Strip ───────────────────────────────────────────────────────────────
-function WeekStrip({ programs, selected, onSelect }) {
+function WeekStrip({ programs, selectedId, onSelect }) {
   const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-  const now = new Date()
-  const todayIdx = now.getDay()
+  const todayIdx = new Date().getDay()
   const scrollRef = useRef(null)
 
   useEffect(() => {
@@ -151,27 +141,23 @@ function WeekStrip({ programs, selected, onSelect }) {
     }
   }, [])
 
-  // Cycle programs across days starting from Monday
-  const getProgForDay = (dayIdx) => {
-    if (programs.length === 0) return null
-    return programs[dayIdx % programs.length] || null
-  }
+  const getProgForDay = (i) => programs.length ? programs[i % programs.length] : null
 
   return (
     <div ref={scrollRef} style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
       {DAYS.map((day, i) => {
         const prog = getProgForDay(i)
         const isToday = i === todayIdx
-        const isSelected = selected?.id === prog?.id && isToday
+        const isSelected = prog && selectedId === prog.id && isToday
 
         return (
           <div key={day} onClick={() => prog && onSelect(prog)}
             style={{
               minWidth: '148px', borderRadius: '18px', padding: '18px',
               background: isToday ? WHITE : CARD,
-              border: `1px solid ${isToday ? 'transparent' : BORDER}`,
+              border: `1px solid ${isSelected ? WHITE : isToday ? 'transparent' : BORDER}`,
               flexShrink: 0, cursor: prog ? 'pointer' : 'default',
-              transition: 'opacity 0.2s',
+              opacity: !prog ? 0.4 : 1,
             }}>
             <p style={{ fontSize: '13px', color: isToday ? '#777' : GRAY2, marginBottom: '8px', fontWeight: '500' }}>{day}</p>
             <p style={{ fontSize: '20px', fontWeight: '700', color: isToday ? '#111' : WHITE, marginBottom: '12px', letterSpacing: '-0.3px' }}>
@@ -197,10 +183,7 @@ function FocusAreas({ todayLogs, programs }) {
   const allExIds = programs.flatMap(p => (p.exercises || []).flatMap(e => [e.id, ...(e.variants || []).map(v => v.id)]))
   const doneCnt = allExIds.filter(id => todayLogs[id]?.done).length
   const total = Math.max(allExIds.length, 1)
-
-  const volume = Object.values(todayLogs).reduce((sum, l) => {
-    return sum + ((parseFloat(l.weight_used) || 0) * (parseFloat(l.reps_done) || 0))
-  }, 0)
+  const volume = Object.values(todayLogs).reduce((sum, l) => sum + ((parseFloat(l.weight_used)||0)*(parseFloat(l.reps_done)||0)), 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -220,7 +203,7 @@ function FocusAreas({ todayLogs, programs }) {
           <p style={{ fontSize: '28px', fontWeight: '700', color: WHITE }}>{doneCnt}</p>
           <p style={{ fontSize: '12px', color: GRAY, marginTop: '2px' }}>of {total}</p>
         </div>
-        <div style={{ display: 'flex', gap: '5px', alignItems: 'center', paddingTop: '8px', flexWrap: 'wrap', maxWidth: '120px', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', maxWidth: '120px', justifyContent: 'flex-end', paddingTop: '8px' }}>
           {Array.from({ length: Math.min(total, 10) }, (_, i) => (
             <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i < doneCnt ? WHITE : GRAY2 }}/>
           ))}
@@ -230,7 +213,7 @@ function FocusAreas({ todayLogs, programs }) {
   )
 }
 
-// ─── Log Set Bottom Sheet ─────────────────────────────────────────────────────
+// ─── Log Set Sheet ────────────────────────────────────────────────────────────
 function LogSetSheet({ ex, log, lastLog, onClose, onLog, onStartRest }) {
   const [weight, setWeight] = useState(String(log?.weight_used || lastLog?.weight_used || ex.weight || ''))
   const [reps, setReps] = useState(String(log?.reps_done || ex.reps || ''))
@@ -279,7 +262,7 @@ function LogSetSheet({ ex, log, lastLog, onClose, onLog, onStartRest }) {
           </div>
         </div>
         <button onClick={handleLog} disabled={!weight || !reps}
-          style={{ ...PILL_BTN, width: '100%', padding: '18px', fontSize: '16px', background: logged ? '#1a3a2a' : (!weight || !reps) ? CARD2 : WHITE, color: logged ? '#10B981' : (!weight || !reps) ? GRAY : '#111', border: logged ? '1px solid #10B981' : 'none', opacity: (!weight || !reps) ? 0.5 : 1, transition: 'all 0.3s' }}>
+          style={{ ...PILL_BTN, width: '100%', padding: '18px', fontSize: '16px', background: logged ? '#1a3a2a' : (!weight||!reps) ? CARD2 : WHITE, color: logged ? '#10B981' : (!weight||!reps) ? GRAY : '#111', border: logged ? '1px solid #10B981' : 'none', opacity: (!weight||!reps) ? 0.5 : 1, transition: 'all 0.3s' }}>
           {logged ? <><CheckIcon size={18} color="#10B981"/> Set Logged</> : <>Log Set <ArrowIcon /></>}
         </button>
       </div>
@@ -400,7 +383,7 @@ function WorkoutTimerBar({ elapsed, running, onToggle, onStop }) {
   )
 }
 
-// ─── Body Weight Section ──────────────────────────────────────────────────────
+// ─── Body Weight ──────────────────────────────────────────────────────────────
 function BodyWeightSection() {
   const [logs, setLogs] = useState([])
   const [weight, setWeight] = useState('')
@@ -557,9 +540,18 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
 
   const startRest = (secs) => setRestTimer({ secs: getRecommendedRest(secs, recoveryScore), key: Date.now() })
 
+  // Selecting a day card just populates the top card — does NOT start workout
   const handleSelectProgram = (p) => {
-    if (selected === p.id) { setSelected(null); onStopWorkout() }
-    else { setSelected(p.id); onStartWorkout() }
+    setSelected(prev => prev === p.id ? null : p.id)
+  }
+
+  const handleStartWorkout = () => {
+    onStartWorkout()
+  }
+
+  const handleEndWorkout = () => {
+    onStopWorkout()
+    setSelected(null)
   }
 
   const saveProg = async () => {
@@ -574,7 +566,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   }
   const saveEx = async () => {
     if (!exForm.name.trim()) return
-    const built = { name: exForm.name, sets: parseInt(exForm.sets) || 1, reps: exForm.reps, weight: exForm.weight, notes: exForm.notes, rest_seconds: parseInt(exForm.rest_seconds) || 90 }
+    const built = { name: exForm.name, sets: parseInt(exForm.sets)||1, reps: exForm.reps, weight: exForm.weight, notes: exForm.notes, rest_seconds: parseInt(exForm.rest_seconds)||90 }
     if (editingEx) await supabase.from('exercises').update(built).eq('id', editingEx.id)
     else if (addingVariantFor) await supabase.from('exercises').insert({ ...built, program_id: selected, parent_id: addingVariantFor })
     else await supabase.from('exercises').insert({ ...built, program_id: selected })
@@ -626,7 +618,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
 
       {activeView === 'training' && (
         <>
-          {/* Today's Workout Card */}
+          {/* Today's Workout Card — shown when a day is selected */}
           {prog ? (
             <ProgressBorderCard pct={donePct}>
               <div style={{ padding: '20px' }}>
@@ -645,11 +637,16 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
                     <span style={{ fontSize: '13px', color: GRAY }}>~52 min avg.</span>
                   </div>
                 </div>
-                <button onClick={() => { if (!workoutActive) onStartWorkout() }}
-                  style={{ ...PILL_BTN, width: '100%', padding: '16px', fontSize: '16px' }}>
-                  {workoutActive ? `${fmtTime(workoutElapsed)} · In progress` : 'Start Workout'}
-                  {!workoutActive && <ArrowIcon color="#111"/>}
-                </button>
+                {/* Always shows Start Workout until tapped */}
+                {!workoutActive ? (
+                  <button onClick={handleStartWorkout} style={{ ...PILL_BTN, width: '100%', padding: '16px', fontSize: '16px' }}>
+                    Start Workout <ArrowIcon color="#111"/>
+                  </button>
+                ) : (
+                  <button style={{ ...PILL_BTN, width: '100%', padding: '16px', fontSize: '16px', background: CARD2, color: WHITE, cursor: 'default' }}>
+                    {fmtTime(workoutElapsed)} · In progress
+                  </button>
+                )}
               </div>
             </ProgressBorderCard>
           ) : (
@@ -659,19 +656,19 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
             </div>
           )}
 
-          {/* Workout timer */}
+          {/* Timer bar — only shows after Start Workout tapped */}
           {workoutActive && (
-            <WorkoutTimerBar elapsed={workoutElapsed} running={workoutRunning} onToggle={onToggleTimer} onStop={() => { onStopWorkout(); setSelected(null) }} />
+            <WorkoutTimerBar elapsed={workoutElapsed} running={workoutRunning} onToggle={onToggleTimer} onStop={handleEndWorkout} />
           )}
 
           {/* This Week */}
           <div style={{ marginBottom: '28px' }}>
             <p style={{ fontSize: '22px', fontWeight: '700', color: WHITE, marginBottom: '16px' }}>This Week</p>
-            <WeekStrip programs={programs} selected={prog} onSelect={handleSelectProgram} />
+            <WeekStrip programs={programs} selectedId={selected} onSelect={handleSelectProgram} />
           </div>
 
-          {/* Exercise list */}
-          {selected && prog && (
+          {/* Exercise list — only shows after Start Workout tapped */}
+          {workoutActive && prog && (
             <div style={{ marginBottom: '28px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                 <p style={{ fontSize: '22px', fontWeight: '700', color: WHITE }}>{prog.name}</p>
