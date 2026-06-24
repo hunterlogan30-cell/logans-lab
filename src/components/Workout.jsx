@@ -1,18 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabase'
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const BG       = '#141414'
-const CARD     = '#1e1e1e'
-const CARD2    = '#252525'
-const BORDER   = '#2a2a2a'
-const WHITE    = '#ffffff'
-const GRAY     = '#888'
-const GRAY2    = '#555'
-const PILL_BTN = { background: WHITE, color: '#111', border: 'none', borderRadius: '100px', padding: '14px 28px', fontSize: '15px', fontWeight: '600', fontFamily: 'Inter, sans-serif', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }
+const BG     = '#141414'
+const CARD   = '#1e1e1e'
+const CARD2  = '#252525'
+const BORDER = '#2a2a2a'
+const WHITE  = '#ffffff'
+const GRAY   = '#888'
+const GRAY2  = '#555'
+
+const PILL_BTN  = { background: WHITE, color: '#111', border: 'none', borderRadius: '100px', padding: '14px 28px', fontSize: '15px', fontWeight: '600', fontFamily: 'Inter, sans-serif', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }
 const GHOST_BTN = { background: CARD2, color: WHITE, border: `1px solid ${BORDER}`, borderRadius: '100px', padding: '12px 24px', fontSize: '14px', fontWeight: '500', fontFamily: 'Inter, sans-serif', cursor: 'pointer' }
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
 const fmtTime = (s) => {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
   if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
@@ -61,37 +60,76 @@ const EditIcon = () => (
 const DumbbellIcon = ({ color = GRAY, size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4v16M18 4v16M3 8h3M18 8h3M3 16h3M18 16h3M6 12h12"/></svg>
 )
-const TimerIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={GRAY} strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+const TimerIcon = ({ color = GRAY }) => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
 )
-const ArrowIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+const ArrowIcon = ({ color = '#111' }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
 )
 
 // ─── Progress Border Card ─────────────────────────────────────────────────────
-function ProgressBorderCard({ pct, children, style = {} }) {
-  const strokeW = 3
-  const radius = 20
+// Uses a canvas-drawn border that animates around the outside of the card
+function ProgressBorderCard({ pct, children }) {
+  const canvasRef = useRef(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
+    const W = canvas.offsetWidth
+    const H = canvas.offsetHeight
+    canvas.width = W * dpr
+    canvas.height = H * dpr
+    const ctx = canvas.getContext('2d')
+    ctx.scale(dpr, dpr)
+
+    const r = 20
+    const lw = 3
+    const half = lw / 2
+
+    // Total perimeter of rounded rect
+    const perimeter = 2 * (W - 2*r) + 2 * (H - 2*r) + 2 * Math.PI * r
+
+    // Draw background border
+    ctx.beginPath()
+    ctx.moveTo(r + half, half)
+    ctx.lineTo(W - r - half, half)
+    ctx.arcTo(W - half, half, W - half, r + half, r)
+    ctx.lineTo(W - half, H - r - half)
+    ctx.arcTo(W - half, H - half, W - r - half, H - half, r)
+    ctx.lineTo(r + half, H - half)
+    ctx.arcTo(half, H - half, half, H - r - half, r)
+    ctx.lineTo(half, r + half)
+    ctx.arcTo(half, half, r + half, half, r)
+    ctx.strokeStyle = BORDER
+    ctx.lineWidth = lw
+    ctx.stroke()
+
+    if (pct <= 0) return
+
+    // Draw progress border
+    const progressLen = perimeter * (pct / 100)
+    ctx.beginPath()
+    ctx.moveTo(r + half, half)
+    ctx.lineTo(W - r - half, half)
+    ctx.arcTo(W - half, half, W - half, r + half, r)
+    ctx.lineTo(W - half, H - r - half)
+    ctx.arcTo(W - half, H - half, W - r - half, H - half, r)
+    ctx.lineTo(r + half, H - half)
+    ctx.arcTo(half, H - half, half, H - r - half, r)
+    ctx.lineTo(half, r + half)
+    ctx.arcTo(half, half, r + half, half, r)
+    ctx.strokeStyle = WHITE
+    ctx.lineWidth = lw
+    ctx.lineCap = 'round'
+    ctx.setLineDash([progressLen, perimeter])
+    ctx.stroke()
+    ctx.setLineDash([])
+  }, [pct])
 
   return (
-    <div style={{ position: 'relative', borderRadius: `${radius}px`, background: CARD, ...style }}>
-      <svg
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 2, overflow: 'visible' }}
-        preserveAspectRatio="none"
-        viewBox="0 0 100 100"
-      >
-        {/* Background border */}
-        <rect x="1.5" y="1.5" width="97" height="97" rx={radius} ry={radius}
-          fill="none" stroke={BORDER} strokeWidth="3" vectorEffect="non-scaling-stroke"/>
-        {/* Progress border */}
-        <rect x="1.5" y="1.5" width="97" height="97" rx={radius} ry={radius}
-          fill="none" stroke={WHITE} strokeWidth="3" vectorEffect="non-scaling-stroke"
-          strokeDasharray={`${pct * 3.88} 388`}
-          strokeLinecap="round"
-          transform="rotate(-90, 50, 50)"
-          style={{ transition: 'stroke-dasharray 0.6s ease' }}
-        />
-      </svg>
+    <div style={{ position: 'relative', borderRadius: '20px', background: CARD, marginBottom: '28px' }}>
+      <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', borderRadius: '20px', pointerEvents: 'none', zIndex: 2 }}/>
       <div style={{ position: 'relative', zIndex: 1 }}>
         {children}
       </div>
@@ -100,52 +138,68 @@ function ProgressBorderCard({ pct, children, style = {} }) {
 }
 
 // ─── Week Strip ───────────────────────────────────────────────────────────────
-function WeekStrip({ programs }) {
-  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+function WeekStrip({ programs, selected, onSelect }) {
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
   const now = new Date()
   const todayIdx = now.getDay()
+  const scrollRef = useRef(null)
 
-  const week = Array.from({ length: 7 }, (_, i) => {
-    return { label: days[i], isToday: i === todayIdx }
-  })
+  useEffect(() => {
+    if (scrollRef.current) {
+      const todayEl = scrollRef.current.children[todayIdx]
+      if (todayEl) todayEl.scrollIntoView({ inline: 'center', behavior: 'smooth' })
+    }
+  }, [])
 
-  const prog = programs[0]
-  const exCount = prog?.exercises?.length || 0
+  // Cycle programs across days starting from Monday
+  const getProgForDay = (dayIdx) => {
+    if (programs.length === 0) return null
+    return programs[dayIdx % programs.length] || null
+  }
 
   return (
-    <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
-      {week.map((d) => (
-        <div key={d.label} style={{
-          minWidth: '140px', borderRadius: '16px', padding: '16px',
-          background: d.isToday ? WHITE : CARD,
-          border: `1px solid ${d.isToday ? 'transparent' : BORDER}`,
-          flexShrink: 0,
-        }}>
-          <p style={{ fontSize: '12px', color: d.isToday ? '#888' : GRAY2, marginBottom: '6px' }}>{d.label}</p>
-          <p style={{ fontSize: '18px', fontWeight: '700', color: d.isToday ? '#111' : WHITE, marginBottom: '10px' }}>
-            {prog?.name || 'Rest'}
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
-            <DumbbellIcon color={d.isToday ? '#888' : GRAY2} size={12}/>
-            <span style={{ fontSize: '12px', color: d.isToday ? '#888' : GRAY2 }}>{exCount} Exercises</span>
+    <div ref={scrollRef} style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+      {DAYS.map((day, i) => {
+        const prog = getProgForDay(i)
+        const isToday = i === todayIdx
+        const isSelected = selected?.id === prog?.id && isToday
+
+        return (
+          <div key={day} onClick={() => prog && onSelect(prog)}
+            style={{
+              minWidth: '148px', borderRadius: '18px', padding: '18px',
+              background: isToday ? WHITE : CARD,
+              border: `1px solid ${isToday ? 'transparent' : BORDER}`,
+              flexShrink: 0, cursor: prog ? 'pointer' : 'default',
+              transition: 'opacity 0.2s',
+            }}>
+            <p style={{ fontSize: '13px', color: isToday ? '#777' : GRAY2, marginBottom: '8px', fontWeight: '500' }}>{day}</p>
+            <p style={{ fontSize: '20px', fontWeight: '700', color: isToday ? '#111' : WHITE, marginBottom: '12px', letterSpacing: '-0.3px' }}>
+              {prog?.name || 'Rest'}
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
+              <DumbbellIcon color={isToday ? '#777' : GRAY2} size={12}/>
+              <span style={{ fontSize: '12px', color: isToday ? '#777' : GRAY2 }}>{prog?.exercises?.length || 0} Exercises</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <TimerIcon color={isToday ? '#777' : GRAY2}/>
+              <span style={{ fontSize: '12px', color: isToday ? '#777' : GRAY2 }}>~52 min avg.</span>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
 
 // ─── Focus Areas ──────────────────────────────────────────────────────────────
 function FocusAreas({ todayLogs, programs }) {
-  const allExercises = programs.flatMap(p => p.exercises || [])
-  const allExIds = allExercises.flatMap(e => [e.id, ...(e.variants || []).map(v => v.id)])
+  const allExIds = programs.flatMap(p => (p.exercises || []).flatMap(e => [e.id, ...(e.variants || []).map(v => v.id)]))
   const doneCnt = allExIds.filter(id => todayLogs[id]?.done).length
   const total = Math.max(allExIds.length, 1)
 
   const volume = Object.values(todayLogs).reduce((sum, l) => {
-    const w = parseFloat(l.weight_used) || 0
-    const r = parseFloat(l.reps_done) || 0
-    return sum + (w * r)
+    return sum + ((parseFloat(l.weight_used) || 0) * (parseFloat(l.reps_done) || 0))
   }, 0)
 
   return (
@@ -160,7 +214,6 @@ function FocusAreas({ todayLogs, programs }) {
           <polyline points="0,28 20,20 40,24 60,10 80,16" stroke={GRAY2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </div>
-
       <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: '16px', padding: '18px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <p style={{ fontSize: '12px', color: GRAY, marginBottom: '6px' }}>Exercises · Today</p>
@@ -193,13 +246,8 @@ function LogSetSheet({ ex, log, lastLog, onClose, onLog, onStartRest }) {
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200, backdropFilter: 'blur(4px)' }}/>
-      <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 201,
-        background: '#1a1a1a', borderRadius: '24px 24px 0 0',
-        padding: '0 20px calc(40px + env(safe-area-inset-bottom))',
-        animation: 'slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1)',
-      }}>
-        <style>{`@keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }`}</style>
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 201, background: '#1a1a1a', borderRadius: '24px 24px 0 0', padding: '0 20px calc(40px + env(safe-area-inset-bottom))', animation: 'slideUp 0.3s cubic-bezier(0.32,0.72,0,1)' }}>
+        <style>{`@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
         <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 20px' }}>
           <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: BORDER }}/>
         </div>
@@ -212,38 +260,26 @@ function LogSetSheet({ ex, log, lastLog, onClose, onLog, onStartRest }) {
             <CloseIcon />
           </button>
         </div>
-
         {(lastLog?.weight_used || lastLog?.reps_done) && (
           <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <TimerIcon />
             <span style={{ fontSize: '13px', color: GRAY }}>Last workout: <strong style={{ color: WHITE }}>{lastLog.weight_used ? `${lastLog.weight_used} lbs` : ''}{lastLog.weight_used && lastLog.reps_done ? ' · ' : ''}{lastLog.reps_done ? `${lastLog.reps_done} reps` : ''}</strong></span>
           </div>
         )}
-
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
           <div>
             <label style={{ fontSize: '12px', color: GRAY, display: 'block', marginBottom: '8px', fontWeight: '500' }}>WEIGHT (LBS)</label>
             <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder={String(ex.weight || '0')}
-              style={{ width: '100%', background: CARD2, border: `1px solid ${BORDER}`, borderRadius: '14px', padding: '16px', color: WHITE, fontSize: '24px', fontWeight: '600', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box', textAlign: 'center' }}
-            />
+              style={{ width: '100%', background: CARD2, border: `1px solid ${BORDER}`, borderRadius: '14px', padding: '16px', color: WHITE, fontSize: '24px', fontWeight: '600', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box', textAlign: 'center' }}/>
           </div>
           <div>
             <label style={{ fontSize: '12px', color: GRAY, display: 'block', marginBottom: '8px', fontWeight: '500' }}>REPS DONE</label>
             <input type="text" value={reps} onChange={e => setReps(e.target.value)} placeholder={String(ex.reps || '0')}
-              style={{ width: '100%', background: CARD2, border: `1px solid ${BORDER}`, borderRadius: '14px', padding: '16px', color: WHITE, fontSize: '24px', fontWeight: '600', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box', textAlign: 'center' }}
-            />
+              style={{ width: '100%', background: CARD2, border: `1px solid ${BORDER}`, borderRadius: '14px', padding: '16px', color: WHITE, fontSize: '24px', fontWeight: '600', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box', textAlign: 'center' }}/>
           </div>
         </div>
-
         <button onClick={handleLog} disabled={!weight || !reps}
-          style={{
-            ...PILL_BTN, width: '100%', padding: '18px', fontSize: '16px',
-            background: logged ? '#1a3a2a' : (!weight || !reps) ? CARD2 : WHITE,
-            color: logged ? '#10B981' : (!weight || !reps) ? GRAY : '#111',
-            border: logged ? '1px solid #10B981' : 'none',
-            opacity: (!weight || !reps) ? 0.5 : 1,
-            transition: 'all 0.3s',
-          }}>
+          style={{ ...PILL_BTN, width: '100%', padding: '18px', fontSize: '16px', background: logged ? '#1a3a2a' : (!weight || !reps) ? CARD2 : WHITE, color: logged ? '#10B981' : (!weight || !reps) ? GRAY : '#111', border: logged ? '1px solid #10B981' : 'none', opacity: (!weight || !reps) ? 0.5 : 1, transition: 'all 0.3s' }}>
           {logged ? <><CheckIcon size={18} color="#10B981"/> Set Logged</> : <>Log Set <ArrowIcon /></>}
         </button>
       </div>
@@ -264,10 +300,7 @@ function RestTimer({ restSeconds, onDismiss }) {
     if (r <= 0 && !alerted.current) { alerted.current = true; clearInterval(intervalRef.current); playBeep(); vibrate([300,100,300]) }
   }
 
-  useEffect(() => {
-    intervalRef.current = setInterval(tick, 500)
-    return () => clearInterval(intervalRef.current)
-  }, [])
+  useEffect(() => { intervalRef.current = setInterval(tick, 500); return () => clearInterval(intervalRef.current) }, [])
 
   const addTime = (s) => { endRef.current = Math.max(Date.now(), endRef.current) + s * 1000; alerted.current = false; tick() }
   const pct = remaining / restSeconds
@@ -275,14 +308,7 @@ function RestTimer({ restSeconds, onDismiss }) {
   const isDone = remaining === 0
 
   return (
-    <div style={{
-      position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)',
-      width: 'calc(100% - 32px)', maxWidth: '390px', zIndex: 150,
-      background: isDone ? '#0d2a1a' : '#1a1a1a',
-      border: `1px solid ${isDone ? '#10B981' : BORDER}`,
-      borderRadius: '20px', padding: '16px 20px',
-      boxShadow: '0 24px 48px rgba(0,0,0,0.6)',
-    }}>
+    <div style={{ position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)', width: 'calc(100% - 32px)', maxWidth: '390px', zIndex: 150, background: isDone ? '#0d2a1a' : '#1a1a1a', border: `1px solid ${isDone ? '#10B981' : BORDER}`, borderRadius: '20px', padding: '16px 20px', boxShadow: '0 24px 48px rgba(0,0,0,0.6)' }}>
       {isDone ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
@@ -329,40 +355,28 @@ function ExerciseRow({ ex, todayLogs, onTap, onToggleDone }) {
   return (
     <div style={{ borderBottom: `1px solid ${BORDER}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 0' }}>
-        <div onClick={() => onToggleDone(ex)} style={{
-          width: '26px', height: '26px', borderRadius: '8px', flexShrink: 0, cursor: 'pointer',
-          background: isDone ? WHITE : CARD2,
-          border: `1.5px solid ${isDone ? WHITE : BORDER}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'all 0.2s',
-        }}>
+        <div onClick={() => onToggleDone(ex)} style={{ width: '26px', height: '26px', borderRadius: '8px', flexShrink: 0, cursor: 'pointer', background: isDone ? WHITE : CARD2, border: `1.5px solid ${isDone ? WHITE : BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
           {isDone && <CheckIcon size={13} color="#111"/>}
         </div>
         <div style={{ flex: 1 }} onClick={() => onTap(ex)}>
           <p style={{ fontSize: '16px', fontWeight: '500', color: isDone ? GRAY : WHITE, textDecoration: isDone ? 'line-through' : 'none', transition: 'all 0.2s' }}>{ex.name}</p>
           <p style={{ fontSize: '13px', color: GRAY2, marginTop: '3px' }}>
-            {ex.sets} sets · {ex.reps} reps
-            {log.weight_used ? <span style={{ color: GRAY }}> · {log.weight_used} lbs</span> : ''}
+            {ex.sets} sets · {ex.reps} reps{log.weight_used ? <span style={{ color: GRAY }}> · {log.weight_used} lbs</span> : ''}
           </p>
         </div>
         <button onClick={() => onTap(ex)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
           <ChevronRight color={isDone ? GRAY2 : GRAY}/>
         </button>
       </div>
-
       {ex.variants?.length > 0 && (
         <div style={{ paddingLeft: '40px', paddingBottom: '10px' }}>
-          {ex.variants.map(v => {
-            const vLog = todayLogs[v.id] || {}
-            return (
-              <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderTop: `1px solid ${BORDER}` }}
-                onClick={() => onTap(v)}>
-                <div style={{ width: '2px', height: '20px', background: BORDER, borderRadius: '1px', flexShrink: 0 }}/>
-                <p style={{ fontSize: '14px', color: vLog.done ? GRAY2 : GRAY, flex: 1 }}>{v.name}</p>
-                <ChevronRight color={GRAY2}/>
-              </div>
-            )
-          })}
+          {ex.variants.map(v => (
+            <div key={v.id} onClick={() => onTap(v)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderTop: `1px solid ${BORDER}`, cursor: 'pointer' }}>
+              <div style={{ width: '2px', height: '20px', background: BORDER, borderRadius: '1px', flexShrink: 0 }}/>
+              <p style={{ fontSize: '14px', color: todayLogs[v.id]?.done ? GRAY2 : GRAY, flex: 1 }}>{v.name}</p>
+              <ChevronRight color={GRAY2}/>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -372,7 +386,7 @@ function ExerciseRow({ ex, todayLogs, onTap, onToggleDone }) {
 // ─── Workout Timer Bar ────────────────────────────────────────────────────────
 function WorkoutTimerBar({ elapsed, running, onToggle, onStop }) {
   return (
-    <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: '14px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+    <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: '14px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: running ? '#10B981' : GRAY, boxShadow: running ? '0 0 8px #10B981' : 'none' }}/>
         <span style={{ fontSize: '13px', color: GRAY }}>In progress</span>
@@ -426,10 +440,9 @@ function BodyWeightSection() {
         <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="185"
           style={{ width: '100%', background: CARD2, border: `1px solid ${BORDER}`, borderRadius: '14px', padding: '16px', color: WHITE, fontSize: '20px', fontWeight: '600', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box', marginBottom: '14px' }}/>
         <button onClick={save} style={{ ...PILL_BTN, width: '100%', opacity: saving ? 0.7 : 1 }}>
-          {saving ? 'Saving...' : todayLog ? 'Update weight' : 'Log weight'} {!saving && <ArrowIcon />}
+          {saving ? 'Saving...' : todayLog ? 'Update weight' : 'Log weight'} {!saving && <ArrowIcon color="#111"/>}
         </button>
       </div>
-
       {logs.length > 0 && (
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: '20px', padding: '24px' }}>
           <p style={{ fontSize: '18px', fontWeight: '700', color: WHITE, marginBottom: '16px' }}>History</p>
@@ -447,7 +460,7 @@ function BodyWeightSection() {
   )
 }
 
-// ─── Sheet (modal bottom sheet) ───────────────────────────────────────────────
+// ─── Sheet ────────────────────────────────────────────────────────────────────
 function Sheet({ title, onClose, children }) {
   return (
     <>
@@ -471,7 +484,7 @@ function Sheet({ title, onClose, children }) {
 const inputStyle = { width: '100%', background: CARD2, border: `1px solid ${BORDER}`, borderRadius: '12px', padding: '14px 16px', color: WHITE, fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box', marginBottom: '12px' }
 const labelStyle = { fontSize: '12px', color: GRAY, display: 'block', marginBottom: '6px', fontWeight: '500' }
 
-// ─── Main Workout Component ───────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function Workout({ workoutActive, workoutElapsed, workoutRunning, onStartWorkout, onStopWorkout, onToggleTimer, recoveryScore }) {
   const [programs, setPrograms] = useState([])
   const [todayLogs, setTodayLogs] = useState({})
@@ -498,7 +511,6 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
         supabase.from('workout_logs').select('*').eq('logged_date', TODAY),
         supabase.from('workout_logs').select('*').lt('logged_date', TODAY).order('logged_date', { ascending: false }).limit(200),
       ])
-
       const exMap = {}
       const topLevel = []
       exs?.forEach(e => { exMap[e.id] = { ...e, variants: [] } })
@@ -507,7 +519,6 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
         else topLevel.push(exMap[e.id])
       })
       setPrograms(progs?.map(p => ({ ...p, exercises: topLevel.filter(e => e.program_id === p.id) })) || [])
-
       const tMap = {}; tLogs?.forEach(l => { tMap[l.exercise_id] = l }); setTodayLogs(tMap)
       const lwMap = {}; lwLogs?.forEach(l => { if (!lwMap[l.exercise_id]) lwMap[l.exercise_id] = l }); setLastWeekLogs(lwMap)
     } catch(e) { console.error(e) }
@@ -546,9 +557,9 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
 
   const startRest = (secs) => setRestTimer({ secs: getRecommendedRest(secs, recoveryScore), key: Date.now() })
 
-  const selectProgram = (id) => {
-    if (id === selected) { setSelected(null); onStopWorkout() }
-    else { setSelected(id); onStartWorkout() }
+  const handleSelectProgram = (p) => {
+    if (selected === p.id) { setSelected(null); onStopWorkout() }
+    else { setSelected(p.id); onStartWorkout() }
   }
 
   const saveProg = async () => {
@@ -561,7 +572,6 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
     await supabase.from('programs').delete().eq('id', editingProg.id)
     setSelected(null); setActiveSheet(null); loadAll()
   }
-
   const saveEx = async () => {
     if (!exForm.name.trim()) return
     const built = { name: exForm.name, sets: parseInt(exForm.sets) || 1, reps: exForm.reps, weight: exForm.weight, notes: exForm.notes, rest_seconds: parseInt(exForm.rest_seconds) || 90 }
@@ -608,13 +618,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
       {/* View toggle */}
       <div style={{ display: 'flex', background: CARD, borderRadius: '14px', padding: '4px', marginBottom: '28px' }}>
         {[{ id: 'training', label: 'Training' }, { id: 'weight', label: 'Body Weight' }].map(v => (
-          <button key={v.id} onClick={() => setActiveView(v.id)} style={{
-            flex: 1, padding: '10px', borderRadius: '10px', cursor: 'pointer',
-            background: activeView === v.id ? WHITE : 'transparent',
-            border: 'none', color: activeView === v.id ? '#111' : GRAY,
-            fontSize: '14px', fontWeight: activeView === v.id ? '600' : '400',
-            fontFamily: 'Inter, sans-serif', transition: 'all 0.2s',
-          }}>{v.label}</button>
+          <button key={v.id} onClick={() => setActiveView(v.id)} style={{ flex: 1, padding: '10px', borderRadius: '10px', cursor: 'pointer', background: activeView === v.id ? WHITE : 'transparent', border: 'none', color: activeView === v.id ? '#111' : GRAY, fontSize: '14px', fontWeight: activeView === v.id ? '600' : '400', fontFamily: 'Inter, sans-serif', transition: 'all 0.2s' }}>{v.label}</button>
         ))}
       </div>
 
@@ -622,37 +626,36 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
 
       {activeView === 'training' && (
         <>
-          {/* Today's Workout Card with progress border */}
+          {/* Today's Workout Card */}
           {prog ? (
-            <ProgressBorderCard pct={donePct} style={{ marginBottom: '28px' }}>
+            <ProgressBorderCard pct={donePct}>
               <div style={{ padding: '20px' }}>
                 <p style={{ fontSize: '13px', color: GRAY, marginBottom: '6px' }}>Today's Workout</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-                  <p style={{ fontSize: '26px', fontWeight: '800', color: WHITE, letterSpacing: '-0.5px' }}>{prog.name}</p>
-                  <p style={{ fontSize: '36px', fontWeight: '800', color: WHITE }}>{donePct}%</p>
+                  <p style={{ fontSize: '28px', fontWeight: '800', color: WHITE, letterSpacing: '-0.5px' }}>{prog.name}</p>
+                  <p style={{ fontSize: '38px', fontWeight: '800', color: WHITE, letterSpacing: '-1px' }}>{donePct}%</p>
                 </div>
-                <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', gap: '16px', marginBottom: '18px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <DumbbellIcon color={GRAY} size={13}/>
                     <span style={{ fontSize: '13px', color: GRAY }}>{prog.exercises.length} Exercises</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <TimerIcon />
+                    <TimerIcon color={GRAY}/>
                     <span style={{ fontSize: '13px', color: GRAY }}>~52 min avg.</span>
                   </div>
                 </div>
-                <button
-                  onClick={() => { if (!workoutActive) onStartWorkout() }}
+                <button onClick={() => { if (!workoutActive) onStartWorkout() }}
                   style={{ ...PILL_BTN, width: '100%', padding: '16px', fontSize: '16px' }}>
                   {workoutActive ? `${fmtTime(workoutElapsed)} · In progress` : 'Start Workout'}
-                  {!workoutActive && <ArrowIcon />}
+                  {!workoutActive && <ArrowIcon color="#111"/>}
                 </button>
               </div>
             </ProgressBorderCard>
           ) : (
-            <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: '20px', padding: '24px', marginBottom: '28px', textAlign: 'center' }}>
-              <p style={{ fontSize: '16px', color: GRAY, marginBottom: '8px' }}>No program selected</p>
-              <p style={{ fontSize: '13px', color: GRAY2 }}>Pick a program below to get started</p>
+            <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: '20px', padding: '28px', marginBottom: '28px', textAlign: 'center' }}>
+              <p style={{ fontSize: '17px', fontWeight: '600', color: WHITE, marginBottom: '6px' }}>No workout selected</p>
+              <p style={{ fontSize: '14px', color: GRAY2 }}>Tap a day below to get started</p>
             </div>
           )}
 
@@ -661,40 +664,11 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
             <WorkoutTimerBar elapsed={workoutElapsed} running={workoutRunning} onToggle={onToggleTimer} onStop={() => { onStopWorkout(); setSelected(null) }} />
           )}
 
-          {/* Programs list */}
-          <div style={{ marginBottom: '28px' }}>
-            <p style={{ fontSize: '22px', fontWeight: '700', color: WHITE, marginBottom: '4px' }}>Programs</p>
-            <div>
-              {programs.map(p => (
-                <div key={p.id} onClick={() => selectProgram(p.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 0', borderBottom: `1px solid ${BORDER}`, cursor: 'pointer' }}>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: '18px', fontWeight: selected === p.id ? '700' : '500', color: selected === p.id ? WHITE : GRAY }}>{p.name}</p>
-                    <p style={{ fontSize: '13px', color: GRAY2, marginTop: '3px' }}>{p.exercises?.length || 0} exercises · {p.tag}</p>
-                  </div>
-                  {selected === p.id ? (
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: WHITE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <CheckIcon size={13} color="#111"/>
-                    </div>
-                  ) : (
-                    <ChevronRight />
-                  )}
-                  <button onClick={e => { e.stopPropagation(); setEditingProg(p); setProgForm({ name: p.name, tag: p.tag }); setActiveSheet('prog') }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', flexShrink: 0 }}>
-                    <EditIcon />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* This Week */}
-          {programs.length > 0 && (
-            <div style={{ marginBottom: '28px' }}>
-              <p style={{ fontSize: '22px', fontWeight: '700', color: WHITE, marginBottom: '16px' }}>This Week</p>
-              <WeekStrip programs={programs} />
-            </div>
-          )}
+          <div style={{ marginBottom: '28px' }}>
+            <p style={{ fontSize: '22px', fontWeight: '700', color: WHITE, marginBottom: '16px' }}>This Week</p>
+            <WeekStrip programs={programs} selected={prog} onSelect={handleSelectProgram} />
+          </div>
 
           {/* Exercise list */}
           {selected && prog && (
@@ -702,9 +676,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                 <p style={{ fontSize: '22px', fontWeight: '700', color: WHITE }}>{prog.name}</p>
                 <button onClick={() => { setEditingEx(null); setAddingVariantFor(null); setExForm({ name: '', sets: '', reps: '', weight: '', notes: '', rest_seconds: '90' }); setActiveSheet('ex') }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: GRAY, fontSize: '14px', fontFamily: 'Inter, sans-serif' }}>
-                  + Add
-                </button>
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: GRAY, fontSize: '14px', fontFamily: 'Inter, sans-serif' }}>+ Add</button>
               </div>
               <div>
                 {prog.exercises.map(ex => (
@@ -733,22 +705,13 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
         </>
       )}
 
-      {/* Rest timer */}
       {restTimer && <RestTimer key={restTimer.key} restSeconds={restTimer.secs} onDismiss={() => setRestTimer(null)} />}
 
-      {/* Log Set Sheet */}
       {activeSheet?.type === 'log' && (
-        <LogSetSheet
-          ex={activeSheet.ex}
-          log={todayLogs[activeSheet.ex.id]}
-          lastLog={lastWeekLogs[activeSheet.ex.id]}
-          onClose={() => setActiveSheet(null)}
-          onLog={handleLogSet}
-          onStartRest={startRest}
-        />
+        <LogSetSheet ex={activeSheet.ex} log={todayLogs[activeSheet.ex.id]} lastLog={lastWeekLogs[activeSheet.ex.id]}
+          onClose={() => setActiveSheet(null)} onLog={handleLogSet} onStartRest={startRest}/>
       )}
 
-      {/* Program Sheet */}
       {activeSheet === 'prog' && (
         <Sheet title={editingProg ? 'Edit program' : 'New program'} onClose={() => setActiveSheet(null)}>
           <label style={labelStyle}>PROGRAM NAME</label>
@@ -759,12 +722,11 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
               <button key={t} onClick={() => setProgForm(f => ({ ...f, tag: t }))} style={{ flex: 1, padding: '10px', borderRadius: '12px', cursor: 'pointer', background: progForm.tag === t ? WHITE : CARD2, border: `1px solid ${progForm.tag === t ? WHITE : BORDER}`, color: progForm.tag === t ? '#111' : GRAY, fontSize: '13px', fontFamily: 'Inter, sans-serif', fontWeight: progForm.tag === t ? '600' : '400' }}>{t}</button>
             ))}
           </div>
-          <button onClick={saveProg} style={{ ...PILL_BTN, width: '100%', marginBottom: '10px' }}>{editingProg ? 'Save changes' : 'Create program'} <ArrowIcon /></button>
+          <button onClick={saveProg} style={{ ...PILL_BTN, width: '100%', marginBottom: '10px' }}>{editingProg ? 'Save changes' : 'Create program'} <ArrowIcon color="#111"/></button>
           {editingProg && <button onClick={deleteProg} style={{ ...GHOST_BTN, width: '100%', color: '#EF4444', border: '1px solid rgba(239,68,68,0.3)' }}>Delete program</button>}
         </Sheet>
       )}
 
-      {/* Exercise Sheet */}
       {activeSheet === 'ex' && (
         <Sheet title={editingEx ? 'Edit exercise' : 'Add exercise'} onClose={() => setActiveSheet(null)}>
           <label style={labelStyle}>EXERCISE NAME</label>
@@ -781,9 +743,8 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
             ))}
           </div>
           <label style={labelStyle}>NOTES</label>
-          <textarea placeholder="e.g. Drop set on last set" value={exForm.notes} onChange={e => setExForm(f => ({ ...f, notes: e.target.value }))} rows={3}
-            style={{ ...inputStyle, resize: 'none', lineHeight: '1.6' }}/>
-          <button onClick={saveEx} style={{ ...PILL_BTN, width: '100%', marginBottom: '10px', marginTop: '12px' }}>{editingEx ? 'Save changes' : 'Add exercise'} <ArrowIcon /></button>
+          <textarea placeholder="e.g. Drop set on last set" value={exForm.notes} onChange={e => setExForm(f => ({ ...f, notes: e.target.value }))} rows={3} style={{ ...inputStyle, resize: 'none', lineHeight: '1.6' }}/>
+          <button onClick={saveEx} style={{ ...PILL_BTN, width: '100%', marginBottom: '10px', marginTop: '12px' }}>{editingEx ? 'Save changes' : 'Add exercise'} <ArrowIcon color="#111"/></button>
           {editingEx && <button onClick={deleteEx} style={{ ...GHOST_BTN, width: '100%', color: '#EF4444', border: '1px solid rgba(239,68,68,0.3)' }}>Delete exercise</button>}
         </Sheet>
       )}
