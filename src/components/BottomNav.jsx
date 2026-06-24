@@ -1,116 +1,91 @@
 import { useEffect, useState } from 'react'
 
+const HomeIcon = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? '#fff' : '#555'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+  </svg>
+)
+const CalIcon = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? '#fff' : '#555'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+  </svg>
+)
+const DumbIcon = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? '#fff' : '#555'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 4v16M18 4v16M3 8h3M18 8h3M3 16h3M18 16h3M6 12h12"/>
+  </svg>
+)
+const PulseIcon = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? '#fff' : '#555'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+  </svg>
+)
+const LeafIcon = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? '#fff' : '#555'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22c0 0-8-4.5-8-11a8 8 0 0 1 16 0c0 6.5-8 11-8 11z"/>
+    <circle cx="12" cy="11" r="2" fill={active ? '#fff' : '#555'} stroke="none"/>
+  </svg>
+)
+
 export default function BottomNav({ tab, setTab }) {
   const [wide, setWide] = useState(window.innerWidth >= 768)
-
   useEffect(() => {
-    const handler = () => setWide(window.innerWidth >= 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
+    const h = () => setWide(window.innerWidth >= 768)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
   }, [])
 
   const tabs = [
-    { id: 'home', label: 'Home', icon: (active) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#fff' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-      </svg>
-    )},
-    { id: 'schedule', label: 'Schedule', icon: (active) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#fff' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-      </svg>
-    )},
-    { id: 'workout', label: 'Workout', icon: (active) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#fff' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M6 4v16M18 4v16M3 8h3M18 8h3M3 16h3M18 16h3M6 12h12"/>
-      </svg>
-    )},
-    { id: 'recovery', label: 'Recovery', icon: (active) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#fff' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-      </svg>
-    )},
-    { id: 'spirit', label: 'Spirit', icon: (active) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#fff' : 'rgba(255,255,255,0.5)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22c0 0-8-4.5-8-11a8 8 0 0 1 16 0c0 6.5-8 11-8 11z"/>
-        <circle cx="12" cy="11" r="2" fill={active ? '#fff' : 'rgba(255,255,255,0.5)'} stroke="none"/>
-      </svg>
-    )},
+    { id: 'home', Icon: HomeIcon },
+    { id: 'schedule', Icon: CalIcon },
+    { id: 'workout', Icon: DumbIcon },
+    { id: 'recovery', Icon: PulseIcon },
+    { id: 'spirit', Icon: LeafIcon },
   ]
 
-  // ── Sidebar (iPad/Desktop) ──────────────────────────────────────────────
   if (wide) {
     return (
       <nav style={{
-        position: 'fixed', left: 0, top: 0, bottom: 0, width: '220px',
-        background: 'rgba(255,255,255,0.07)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        borderRight: '1px solid rgba(255,255,255,0.12)',
-        display: 'flex', flexDirection: 'column',
-        padding: '32px 12px 24px',
-        zIndex: 100,
-        gap: '4px',
+        position: 'fixed', left: 0, top: 0, bottom: 0, width: '72px',
+        background: '#111', borderRight: '1px solid #1e1e1e',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        paddingTop: '48px', paddingBottom: '32px', gap: '8px', zIndex: 100,
       }}>
-        <div style={{ marginBottom: '32px', paddingLeft: '12px' }}>
-          <p style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.5px', color: '#fff' }}>Logan's Lab</p>
-          <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '2px' }}>Life OS</p>
-        </div>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            display: 'flex', alignItems: 'center', gap: '12px',
-            padding: '11px 14px', borderRadius: '14px', cursor: 'pointer',
-            background: tab === t.id ? 'rgba(255,255,255,0.14)' : 'transparent',
-            border: tab === t.id ? '1px solid rgba(255,255,255,0.18)' : '1px solid transparent',
-            color: tab === t.id ? '#fff' : 'rgba(255,255,255,0.5)',
-            fontSize: '14px', fontWeight: tab === t.id ? '600' : '400',
-            fontFamily: 'Inter, sans-serif',
-            textAlign: 'left', width: '100%',
-            transition: 'all 0.2s',
-            boxShadow: tab === t.id ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+        {tabs.map(({ id, Icon }) => (
+          <button key={id} onClick={() => setTab(id)} style={{
+            width: '48px', height: '48px', borderRadius: '14px', cursor: 'pointer',
+            background: tab === id ? '#1e1e1e' : 'transparent',
+            border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'background 0.2s',
           }}>
-            {t.icon(tab === t.id)}
-            {t.label}
+            <Icon active={tab === id} />
           </button>
         ))}
       </nav>
     )
   }
 
-  // ── Bottom Nav (Mobile) ────────────────────────────────────────────────
   return (
     <nav style={{
-      position: 'fixed', bottom: '16px',
-      left: '50%', transform: 'translateX(-50%)',
-      width: 'calc(100% - 32px)', maxWidth: '430px',
-      background: 'rgba(255,255,255,0.1)',
-      border: '1px solid rgba(255,255,255,0.2)',
-      borderRadius: '24px',
-      padding: '9px',
-      display: 'flex', gap: '4px',
+      position: 'fixed', bottom: 0, left: 0, right: 0,
+      background: '#111', borderTop: '1px solid #1e1e1e',
+      display: 'flex', alignItems: 'center',
+      padding: '10px 0 calc(10px + env(safe-area-inset-bottom))',
       zIndex: 100,
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      boxShadow: '0px 25px 50px -12px rgba(0,0,0,0.25)',
     }}>
-      {tabs.map(t => (
-        <button key={t.id} onClick={() => setTab(t.id)} style={{
-          flex: 1,
-          background: tab === t.id ? 'rgba(255,255,255,0.24)' : 'transparent',
-          border: 'none', cursor: 'pointer',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-          gap: '4px', padding: '8px 4px',
-          borderRadius: '16px',
-          color: tab === t.id ? '#fff' : 'rgba(255,255,255,0.5)',
-          fontSize: '10px', fontWeight: '500',
-          letterSpacing: '0.12px',
-          boxShadow: tab === t.id ? '0px 10px 15px -3px rgba(0,0,0,0.1)' : 'none',
-          transition: 'all 0.2s',
-          fontFamily: 'Inter, sans-serif',
+      {tabs.map(({ id, Icon }) => (
+        <button key={id} onClick={() => setTab(id)} style={{
+          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', background: 'none', border: 'none',
+          cursor: 'pointer', padding: '4px 0', position: 'relative',
         }}>
-          {t.icon(tab === t.id)}
-          {t.label}
+          <Icon active={tab === id} />
+          {tab === id && (
+            <div style={{
+              position: 'absolute', bottom: '-6px',
+              width: '4px', height: '4px', borderRadius: '50%', background: '#fff',
+            }} />
+          )}
         </button>
       ))}
     </nav>

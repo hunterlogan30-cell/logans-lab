@@ -1,24 +1,26 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  touch-action: manipulation;
 }
 
 html {
   height: 100%;
-  background: #121B2E;
+  background: #141414;
+  touch-action: manipulation;
 }
 
 body {
   font-family: 'Inter', sans-serif;
   min-height: 100%;
   min-height: 100dvh;
-  background: linear-gradient(180deg, #121B2E 0%, #5652E9 100%);
-  background-attachment: fixed;
+  background: #141414;
   color: #fff;
   overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {
@@ -26,13 +28,16 @@ body {
   margin: 0 auto;
   min-height: 100dvh;
 }
-html {
-  touch-action: manipulation;
-}
 
-* {
-  touch-action: manipulation;
-}
 input, textarea, select {
   font-size: 16px !important;
+  font-family: 'Inter', sans-serif;
+}
+
+button {
+  font-family: 'Inter', sans-serif;
+}
+
+::-webkit-scrollbar {
+  display: none;
 }
