@@ -137,18 +137,20 @@ function WeekStrip({ programs, selectedId, onSelect }) {
       {DAYS.map((day, i) => {
         const prog = programs.length ? programs[i % programs.length] : null
         const isToday = i === todayIdx
+        const isSelected = prog?.id === selectedId
+        const highlighted = isSelected || (!selectedId && isToday)
         return (
           <div key={day} onClick={() => prog && onSelect(prog)}
-            style={{ minWidth: '148px', borderRadius: '18px', padding: '18px', background: isToday ? WHITE : CARD, flexShrink: 0, cursor: prog ? 'pointer' : 'default', opacity: !prog ? 0.4 : 1 }}>
-            <p style={{ fontSize: '13px', color: isToday ? '#777' : GRAY2, marginBottom: '8px', fontWeight: '500' }}>{day}</p>
-            <p style={{ fontSize: '20px', fontWeight: '700', color: isToday ? '#111' : WHITE, marginBottom: '12px', letterSpacing: '-0.3px' }}>{prog?.name || 'Rest'}</p>
+            style={{ minWidth: '148px', borderRadius: '18px', padding: '18px', background: highlighted ? WHITE : CARD, flexShrink: 0, cursor: prog ? 'pointer' : 'default', opacity: !prog ? 0.4 : 1 }}>
+            <p style={{ fontSize: '13px', color: highlighted ? '#777' : GRAY2, marginBottom: '8px', fontWeight: '500' }}>{isToday ? 'Today' : day}</p>
+            <p style={{ fontSize: '20px', fontWeight: '700', color: highlighted ? '#111' : WHITE, marginBottom: '12px', letterSpacing: '-0.3px' }}>{prog?.name || 'Rest'}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
-              <DumbbellIcon color={isToday ? '#777' : GRAY2} size={12}/>
-              <span style={{ fontSize: '12px', color: isToday ? '#777' : GRAY2 }}>{prog?.exercises?.length || 0} Exercises</span>
+              <DumbbellIcon color={highlighted ? '#777' : GRAY2} size={12}/>
+              <span style={{ fontSize: '12px', color: highlighted ? '#777' : GRAY2 }}>{prog?.exercises?.length || 0} Exercises</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <TimerIcon color={isToday ? '#777' : GRAY2}/>
-              <span style={{ fontSize: '12px', color: isToday ? '#777' : GRAY2 }}>~52 min avg.</span>
+              <TimerIcon color={highlighted ? '#777' : GRAY2}/>
+              <span style={{ fontSize: '12px', color: highlighted ? '#777' : GRAY2 }}>~52 min avg.</span>
             </div>
           </div>
         )
