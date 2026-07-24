@@ -108,6 +108,11 @@ const FireIcon = ({ color = '#FF6B35', size = 14 }) => (
     <path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 3z"/>
   </svg>
 )
+const MustacheIcon = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="white" stroke="none">
+    <path d="M3.5 10.5c0 0 1.5-2 3.5-2c1.2 0 2 .6 2.5 1c.3.2.5.3.5.3V11s-.8-.5-2-.5c-1 0-1.8.4-2.3.7C5.2 11.5 4.5 12 4 12c-.8 0-1-.5-.5-1.5zm17 0c0 0-1.5-2-3.5-2c-1.2 0-2 .6-2.5 1c-.3.2-.5.3-.5.3V11s.8-.5 2-.5c1 0 1.8.4 2.3.7c.5.3 1.2.8 1.7.8c.8 0 1-.5.5-1.5zM10 9.8c0 0 .5 1.2 2 1.2s2-1.2 2-1.2"/>
+  </svg>
+)
 
 // ─── Analytics Chart ──────────────────────────────────────────────────────────
 function AnalyticsChart({ logs }) {
@@ -1013,7 +1018,8 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   const [activeView, setActiveView]         = useState('training')
   const [showWorkout, setShowWorkout]       = useState(false)
   const [editingProg, setEditingProg]       = useState(null)
-  const [progForm, setProgForm]             = useState({ name: '', tag: 'Strength' })
+ const [progForm, setProgForm]             = useState({ name: '', tag: 'Strength' })
+  const [showCoach, setShowCoach]           = useState(false)
   const [weeklyWorkoutDays, setWeeklyWorkoutDays] = useState(new Set())
   const [workoutStreak, setWorkoutStreak]   = useState(0)
 
@@ -1155,10 +1161,16 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
             </div>
           )}
         </div>
-        <button onClick={() => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setActiveSheet('prog') }}
-          style={{ width: '40px', height: '40px', borderRadius: '12px', background: CARD, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <PlusIcon size={18} />
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button onClick={() => setShowCoach(true)}
+            style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 0 16px rgba(99,102,241,0.6), 0 0 32px rgba(59,130,246,0.3)' }}>
+            <MustacheIcon size={20} />
+          </button>
+          <button onClick={() => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setActiveSheet('prog') }}
+            style={{ width: '40px', height: '40px', borderRadius: '12px', background: CARD, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <PlusIcon size={18} />
+          </button>
+        </div>
       </div>
 
       {/* View toggle */}
@@ -1221,7 +1233,16 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
           )}
         </>
       )}
-
+{showCoach && (
+        <Sheet title="AI Coach" onClose={() => setShowCoach(false)}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0 8px', gap: '12px' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #3B82F6, #6366F1)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 24px rgba(99,102,241,0.5)' }}>
+              <MustacheIcon size={28} />
+            </div>
+            <p style={{ fontSize: '16px', color: GRAY, textAlign: 'center', lineHeight: 1.6 }}>Your AI coach is coming soon. Drop in your Gemini key and I'll start giving you recommendations based on your training data.</p>
+          </div>
+        </Sheet>
+      )}
       {activeSheet === 'prog' && (
         <Sheet title={editingProg ? 'Edit program' : 'New program'} onClose={() => setActiveSheet(null)}>
           <label style={labelStyle}>PROGRAM NAME</label>
