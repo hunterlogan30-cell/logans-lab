@@ -141,7 +141,7 @@ function SwipeableExerciseRow({ ex, isDone, onTap, onToggleDone, onDeleteIntent 
   }
 
   const onTouchMove = (e) => {
-    const dx = startX.current - e.touches[0].clientX
+    const dx = e.touches[0].clientX - startX.current
     const dy = Math.abs(e.touches[0].clientY - startY.current)
 
     if (isScrolling.current === null) {
@@ -196,11 +196,13 @@ function SwipeableExerciseRow({ ex, isDone, onTap, onToggleDone, onDeleteIntent 
   const circleBorder = showTrash ? `2px solid rgba(239,68,68,${0.4 + morphPct * 0.6})` : `2px solid ${isDone ? WHITE : '#333'}`
 
   return (
-    <div
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onClick={handleRowClick}
+    <>
+      <style>{`@keyframes trashShake{0%,100%{transform:rotate(0deg)}25%{transform:rotate(-15deg)}75%{transform:rotate(15deg)}}`}</style>
+      <div
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onClick={handleRowClick}
       style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 0', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none' }}
     >
       {/* Circle → Trash */}
@@ -212,6 +214,7 @@ function SwipeableExerciseRow({ ex, isDone, onTap, onToggleDone, onDeleteIntent 
           border: circleBorder,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: dragging ? 'none' : 'all 0.25s',
+          animation: pastCommit ? 'trashShake 0.25s ease infinite' : 'none',
         }}
       >
         {showTrash
@@ -235,9 +238,9 @@ function SwipeableExerciseRow({ ex, isDone, onTap, onToggleDone, onDeleteIntent 
 
       <ChevronRight color={GRAY2}/>
     </div>
+    </>
   )
 }
-
 // ─── Swipeable Set Row ────────────────────────────────────────────────────────
 // Same pattern: swipe left → circle morphs to trash → release → confirm.
 function SwipeableSetRow({ setData, idx, onToggleDone, onOpenPicker, onDeleteIntent }) {
@@ -266,7 +269,7 @@ function SwipeableSetRow({ setData, idx, onToggleDone, onOpenPicker, onDeleteInt
   }
 
   const onTouchMove = (e) => {
-    const dx = startX.current - e.touches[0].clientX
+    const dx = e.touches[0].clientX - startX.current
     const dy = Math.abs(e.touches[0].clientY - startY.current)
 
     if (isScrolling.current === null) {
@@ -328,6 +331,7 @@ function SwipeableSetRow({ setData, idx, onToggleDone, onOpenPicker, onDeleteInt
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer',
           transition: dragging ? 'none' : 'all 0.25s',
+          animation: pastCommit ? 'trashShake 0.25s ease infinite' : 'none',
         }}
       >
         {showTrash
