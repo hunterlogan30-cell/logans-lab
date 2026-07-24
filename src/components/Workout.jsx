@@ -336,14 +336,14 @@ function WeekStrip({ programs, selectedDayOfWeek, onSelect, onAddProgram, onDele
   const pressTimer  = useRef(null)
   const touchStartY = useRef(0)
   const liveY       = useRef(0)
-  const COMMIT_Y    = 60
+  const COMMIT_Y    = 70
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const dow = (todayDow + i) % 7
     return { dow, label: i === 0 ? 'Today' : LABELS[dow], prog: programs.length ? programs[i % programs.length] : null }
   })
 
-  const startPress = (dow) => { pressTimer.current = setTimeout(() => { vibrate([30]); setDeletingDow(dow) }, 500) }
+  const startPress  = (dow) => { pressTimer.current = setTimeout(() => { vibrate([30]); setDeletingDow(dow) }, 500) }
   const cancelPress = () => clearTimeout(pressTimer.current)
 
   const onCardTouchStart = (e, dow) => { touchStartY.current = e.touches[0].clientY; liveY.current = 0; setSwipeY(0); startPress(dow) }
@@ -361,9 +361,8 @@ function WeekStrip({ programs, selectedDayOfWeek, onSelect, onAddProgram, onDele
   }
 
   return (
-    <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-      <style>{`@keyframes trashBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}`}</style>
-
+    <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '16px', scrollbarWidth: 'none' }}>
+      {/* New program card */}
       <div onClick={onAddProgram}
         style={{ minWidth: '148px', borderRadius: '18px', padding: '18px', background: CARD, flexShrink: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', minHeight: '152px' }}>
         <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: CARD2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -377,19 +376,30 @@ function WeekStrip({ programs, selectedDayOfWeek, onSelect, onAddProgram, onDele
         const isDeleting = dow === deletingDow
         const swipePct   = Math.min(swipeY / COMMIT_Y, 1)
         const pastCommit = swipeY >= COMMIT_Y
+        const cardTranslate = isDeleting ? Math.min(swipeY * 0.55, COMMIT_Y * 0.55) : 0
+
         return (
-          <div key={dow} style={{ minWidth: '148px', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-            {isDeleting && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', animation: 'trashBounce 0.4s ease infinite' }}>
-                <TrashIcon size={22} color={pastCommit ? '#EF4444' : `rgba(239,68,68,${0.3 + swipePct * 0.7})`}/>
-              </div>
-            )}
+          <div key={dow} style={{ minWidth: '148px', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+
+            {/* Card — stays full size, only moves down when swiping */}
             <div
               onTouchStart={e => prog && onCardTouchStart(e, dow)}
               onTouchMove={e => onCardTouchMove(e, dow)}
               onTouchEnd={() => onCardTouchEnd(dow)}
               onClick={() => { if (!isDeleting && prog) onSelect(prog, dow) }}
-              style={{ width: '100%', borderRadius: '18px', padding: '18px', background: isSelected ? WHITE : CARD, cursor: prog ? 'pointer' : 'default', opacity: !prog ? 0.4 : 1, transition: isDeleting ? 'none' : 'all 0.2s', transform: isDeleting ? `scale(${1 - swipePct * 0.06}) translateY(${swipeY * 0.3}px)` : 'scale(1)', boxShadow: isDeleting ? `0 0 0 2px rgba(239,68,68,${swipePct * 0.6})` : 'none' }}>
+              style={{
+                width: '100%',
+                borderRadius: '18px',
+                padding: '18px',
+                background: isSelected ? WHITE : CARD,
+                cursor: prog ? 'pointer' : 'default',
+                opacity: !prog ? 0.4 : 1,
+                transform: `translateY(${cardTranslate}px)`,
+                transition: isDeleting ? 'none' : 'all 0.25s',
+                boxShadow: isDeleting && swipePct > 0.05 ? `0 0 0 2px rgba(239,68,68,${swipePct * 0.7})` : 'none',
+                position: 'relative',
+                zIndex: 2,
+              }}>
               <p style={{ fontSize: '13px', color: isSelected ? '#777' : GRAY2, marginBottom: '8px', fontWeight: '500' }}>{label}</p>
               <p style={{ fontSize: '20px', fontWeight: '700', color: isSelected ? '#111' : WHITE, marginBottom: '12px', letterSpacing: '-0.3px' }}>{prog?.name || 'Rest'}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
@@ -401,6 +411,28 @@ function WeekStrip({ programs, selectedDayOfWeek, onSelect, onAddProgram, onDele
                 <span style={{ fontSize: '12px', color: isSelected ? '#777' : GRAY2 }}>~52 min avg.</span>
               </div>
             </div>
+
+            {/* Trash circle — appears below card, you swipe the card down into it */}
+            {isDeleting && (
+              <div style={{
+                position: 'absolute',
+                bottom: '-64px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: `rgba(239,68,68,${0.06 + swipePct * 0.16})`,
+                border: `2px solid rgba(239,68,68,${0.2 + swipePct * 0.8})`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1,
+                transition: 'none',
+              }}>
+                <TrashIcon size={20} color={pastCommit ? '#EF4444' : `rgba(239,68,68,${0.35 + swipePct * 0.65})`}/>
+              </div>
+            )}
           </div>
         )
       })}
