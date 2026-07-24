@@ -102,7 +102,7 @@ const GearIcon = ({ color = GRAY, size = 18 }) => (
     <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
   </svg>
 )
-const FireIcon = ({ color = '#FF6B35', size = 14 }) => (
+const FireIcon = ({ color = '#6366F1', size = 14 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 3z"/>
   </svg>
@@ -328,15 +328,42 @@ function ProgressBorderCard({ pct, children }) {
 }
 
 // ─── Week Strip ───────────────────────────────────────────────────────────────
-function WeekStrip({ programs, selectedDayOfWeek, onSelect, onAddProgram }) {
-  const LABELS  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+function WeekStrip({ programs, selectedDayOfWeek, onSelect, onAddProgram, onDeleteProgram }) {
+  const LABELS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
   const todayDow = new Date().getDay()
+  const [deletingDow, setDeletingDow] = useState(null)
+  const [swipeY, setSwipeY]           = useState(0)
+  const pressTimer  = useRef(null)
+  const touchStartY = useRef(0)
+  const liveY       = useRef(0)
+  const COMMIT_Y    = 60
+
   const days = Array.from({ length: 7 }, (_, i) => {
     const dow = (todayDow + i) % 7
     return { dow, label: i === 0 ? 'Today' : LABELS[dow], prog: programs.length ? programs[i % programs.length] : null }
   })
+
+  const startPress = (dow) => { pressTimer.current = setTimeout(() => { vibrate([30]); setDeletingDow(dow) }, 500) }
+  const cancelPress = () => clearTimeout(pressTimer.current)
+
+  const onCardTouchStart = (e, dow) => { touchStartY.current = e.touches[0].clientY; liveY.current = 0; setSwipeY(0); startPress(dow) }
+  const onCardTouchMove  = (e, dow) => {
+    const dy = e.touches[0].clientY - touchStartY.current
+    if (Math.abs(dy) > 8) cancelPress()
+    if (deletingDow === dow) { liveY.current = Math.max(0, dy); setSwipeY(Math.max(0, dy)) }
+  }
+  const onCardTouchEnd = (dow) => {
+    cancelPress()
+    if (deletingDow === dow) {
+      if (liveY.current >= COMMIT_Y) { vibrate([40, 20, 60]); onDeleteProgram(dow) }
+      setDeletingDow(null); setSwipeY(0); liveY.current = 0
+    }
+  }
+
   return (
     <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+      <style>{`@keyframes trashBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}`}</style>
+
       <div onClick={onAddProgram}
         style={{ minWidth: '148px', borderRadius: '18px', padding: '18px', background: CARD, flexShrink: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', minHeight: '152px' }}>
         <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: CARD2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -344,20 +371,35 @@ function WeekStrip({ programs, selectedDayOfWeek, onSelect, onAddProgram }) {
         </div>
         <p style={{ fontSize: '13px', color: GRAY, fontWeight: '500', textAlign: 'center' }}>New program</p>
       </div>
+
       {days.map(({ dow, label, prog }) => {
         const isSelected = dow === selectedDayOfWeek
+        const isDeleting = dow === deletingDow
+        const swipePct   = Math.min(swipeY / COMMIT_Y, 1)
+        const pastCommit = swipeY >= COMMIT_Y
         return (
-          <div key={dow} onClick={() => prog && onSelect(prog, dow)}
-            style={{ minWidth: '148px', borderRadius: '18px', padding: '18px', background: isSelected ? WHITE : CARD, flexShrink: 0, cursor: prog ? 'pointer' : 'default', opacity: !prog ? 0.4 : 1, transition: 'background 0.2s' }}>
-            <p style={{ fontSize: '13px', color: isSelected ? '#777' : GRAY2, marginBottom: '8px', fontWeight: '500' }}>{label}</p>
-            <p style={{ fontSize: '20px', fontWeight: '700', color: isSelected ? '#111' : WHITE, marginBottom: '12px', letterSpacing: '-0.3px' }}>{prog?.name || 'Rest'}</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
-              <DumbbellIcon color={isSelected ? '#777' : GRAY2} size={12}/>
-              <span style={{ fontSize: '12px', color: isSelected ? '#777' : GRAY2 }}>{prog?.exercises?.length || 0} Exercises</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <TimerIcon color={isSelected ? '#777' : GRAY2}/>
-              <span style={{ fontSize: '12px', color: isSelected ? '#777' : GRAY2 }}>~52 min avg.</span>
+          <div key={dow} style={{ minWidth: '148px', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            {isDeleting && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', animation: 'trashBounce 0.4s ease infinite' }}>
+                <TrashIcon size={22} color={pastCommit ? '#EF4444' : `rgba(239,68,68,${0.3 + swipePct * 0.7})`}/>
+              </div>
+            )}
+            <div
+              onTouchStart={e => prog && onCardTouchStart(e, dow)}
+              onTouchMove={e => onCardTouchMove(e, dow)}
+              onTouchEnd={() => onCardTouchEnd(dow)}
+              onClick={() => { if (!isDeleting && prog) onSelect(prog, dow) }}
+              style={{ width: '100%', borderRadius: '18px', padding: '18px', background: isSelected ? WHITE : CARD, cursor: prog ? 'pointer' : 'default', opacity: !prog ? 0.4 : 1, transition: isDeleting ? 'none' : 'all 0.2s', transform: isDeleting ? `scale(${1 - swipePct * 0.06}) translateY(${swipeY * 0.3}px)` : 'scale(1)', boxShadow: isDeleting ? `0 0 0 2px rgba(239,68,68,${swipePct * 0.6})` : 'none' }}>
+              <p style={{ fontSize: '13px', color: isSelected ? '#777' : GRAY2, marginBottom: '8px', fontWeight: '500' }}>{label}</p>
+              <p style={{ fontSize: '20px', fontWeight: '700', color: isSelected ? '#111' : WHITE, marginBottom: '12px', letterSpacing: '-0.3px' }}>{prog?.name || 'Rest'}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
+                <DumbbellIcon color={isSelected ? '#777' : GRAY2} size={12}/>
+                <span style={{ fontSize: '12px', color: isSelected ? '#777' : GRAY2 }}>{prog?.exercises?.length || 0} Exercises</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <TimerIcon color={isSelected ? '#777' : GRAY2}/>
+                <span style={{ fontSize: '12px', color: isSelected ? '#777' : GRAY2 }}>~52 min avg.</span>
+              </div>
             </div>
           </div>
         )
@@ -384,9 +426,9 @@ function ThisWeekSection({ weeklyWorkoutDays, workoutStreak, todayLogs }) {
           <p style={{ fontSize: '12px', color: GRAY, marginTop: '2px' }}>lbs</p>
         </div>
         {workoutStreak > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,107,53,0.12)', borderRadius: '100px', padding: '8px 14px' }}>
-            <FireIcon size={14} color="#FF6B35"/>
-            <span style={{ fontSize: '13px', fontWeight: '700', color: '#FF6B35' }}>{workoutStreak} week{workoutStreak !== 1 ? 's' : ''}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(99,102,241,0.12)', borderRadius: '100px', padding: '8px 14px' }}>
+            <FireIcon size={14} color="#6366F1"/>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: '#6366F1' }}>{workoutStreak} week{workoutStreak !== 1 ? 's' : ''}</span>
           </div>
         )}
       </div>
@@ -858,6 +900,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   const [progForm, setProgForm]                   = useState({ name: '', tag: 'Strength' })
   const [weeklyWorkoutDays, setWeeklyWorkoutDays] = useState(new Set())
   const [workoutStreak, setWorkoutStreak]         = useState(0)
+  const [confirmDeleteProg, setConfirmDeleteProg] = useState(null)
 
   useEffect(() => { loadAll() }, [])
 
@@ -969,8 +1012,8 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
           <p style={{ fontSize: '14px', color: GRAY, marginTop: '6px' }}>{dateStr}</p>
           {workoutStreak > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }}>
-              <FireIcon size={13} color="#FF6B35"/>
-              <span style={{ fontSize: '13px', color: '#FF6B35', fontWeight: '600' }}>{workoutStreak} week streak</span>
+              <FireIcon size={13} color="#6366F1"/>
+              <span style={{ fontSize: '13px', color: '#6366F1', fontWeight: '600' }}>{workoutStreak} week streak</span>
             </div>
           )}
         </div>
@@ -1034,6 +1077,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
               selectedDayOfWeek={selectedDayOfWeek}
               onSelect={handleSelectProgram}
               onAddProgram={() => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setActiveSheet('prog') }}
+              onDeleteProgram={(dow) => { const p = programs[dow % programs.length]; if (p) setConfirmDeleteProg(p) }}
             />
           </div>
 
@@ -1044,6 +1088,15 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
             </div>
           )}
         </>
+      )}
+
+      {confirmDeleteProg && (
+        <ConfirmDeleteModal
+          title={`Delete "${confirmDeleteProg.name}"?`}
+          subtitle="This will permanently delete the program and all its exercises. This cannot be undone."
+          onConfirm={async () => { await supabase.from('programs').delete().eq('id', confirmDeleteProg.id); setConfirmDeleteProg(null); setSelected(null); setSelectedDayOfWeek(null); loadAll() }}
+          onCancel={() => setConfirmDeleteProg(null)}
+        />
       )}
 
       {showCoach && (
