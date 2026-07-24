@@ -537,7 +537,6 @@ function NumberPicker({ label, value, isReps, onSave, onClose }) {
                 <button onClick={() => inc(setRangeHigh, rangeHigh)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
               </div>
             </div>
-            </div>
           </div>
         )}
         <button onClick={handleSave} style={{ ...PILL_BTN, width: '100%', padding: '16px', fontSize: '16px' }}>Done <ArrowIcon /></button>
