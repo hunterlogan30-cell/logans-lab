@@ -1163,8 +1163,8 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button onClick={() => setShowCoach(true)}
-            style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 0 16px rgba(99,102,241,0.6), 0 0 32px rgba(59,130,246,0.3)' }}>
-            <MustacheIcon size={20} />
+            style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CARD, boxShadow: '0 0 16px rgba(99,102,241,0.5), 0 0 32px rgba(59,130,246,0.25)' }}>
+            <MustacheIcon size={26} />
           </button>
           <button onClick={() => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setActiveSheet('prog') }}
             style={{ width: '40px', height: '40px', borderRadius: '12px', background: CARD, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
