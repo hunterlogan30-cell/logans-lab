@@ -84,6 +84,118 @@ const ArrowIcon = ({ color = '#111' }) => (
 const SearchIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GRAY} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 )
+const TrashIcon = ({ color = '#EF4444', size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+)
+
+// ─── Swipeable Row ────────────────────────────────────────────────────────────
+function SwipeableRow({ onDelete, children, bgColor = BG }) {
+  const [offsetX, setOffsetX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const startX = useRef(0)
+  const startY = useRef(0)
+  const liveOffset = useRef(0)
+  const lastVibrateAt = useRef(0)
+  const isScrolling = useRef(null)
+
+  const SHOW   = 12
+  const RED    = 72
+  const COMMIT = 130
+
+  const onTouchStart = (e) => {
+    startX.current = e.touches[0].clientX
+    startY.current = e.touches[0].clientY
+    isScrolling.current = null
+    setDragging(true)
+  }
+
+  const onTouchMove = (e) => {
+    const dx = startX.current - e.touches[0].clientX
+    const dy = Math.abs(e.touches[0].clientY - startY.current)
+
+    // Detect scroll vs swipe on first significant movement
+    if (isScrolling.current === null) {
+      if (Math.abs(dx) < 5 && dy < 5) return
+      isScrolling.current = dy > Math.abs(dx)
+    }
+
+    // If scrolling vertically, ignore horizontal
+    if (isScrolling.current) return
+
+    if (dx <= 0) { liveOffset.current = 0; setOffsetX(0); return }
+
+    // Rubber band past commit
+    const clamped = dx < COMMIT ? dx : COMMIT + (dx - COMMIT) * 0.15
+    liveOffset.current = clamped
+    setOffsetX(clamped)
+
+    if (dx >= RED) {
+      const now = Date.now()
+      if (now - lastVibrateAt.current > 250) {
+        vibrate([15])
+        lastVibrateAt.current = now
+      }
+    }
+  }
+
+  const onTouchEnd = () => {
+    setDragging(false)
+    if (liveOffset.current >= COMMIT) {
+      vibrate([60, 30, 100])
+      onDelete()
+    } else {
+      setOffsetX(0)
+    }
+    liveOffset.current = 0
+  }
+
+  const pastRed  = offsetX >= RED
+  const visible  = offsetX >= SHOW
+
+  return (
+    <div style={{ position: 'relative', overflow: 'hidden' }}>
+      <style>{`
+        @keyframes trashShake {
+          0%,100% { transform: rotate(0deg) scale(1); }
+          20%      { transform: rotate(-18deg) scale(1.15); }
+          50%      { transform: rotate(14deg) scale(1.2); }
+          80%      { transform: rotate(-10deg) scale(1.15); }
+        }
+      `}</style>
+
+      {/* Trash reveal */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+        paddingRight: '24px',
+        opacity: visible ? 1 : 0,
+        transition: dragging ? 'none' : 'opacity 0.2s',
+      }}>
+        <div style={{
+          animation: pastRed ? 'trashShake 0.3s ease infinite' : 'none',
+          transition: 'color 0.15s',
+        }}>
+          <TrashIcon color={pastRed ? '#EF4444' : GRAY2} size={22} />
+        </div>
+      </div>
+
+      {/* Sliding content */}
+      <div
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{
+          transform: `translateX(-${offsetX}px)`,
+          transition: dragging ? 'none' : 'transform 0.35s cubic-bezier(0.32,0.72,0,1)',
+          willChange: 'transform',
+          background: bgColor,
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
 
 // ─── Progress Border Card ─────────────────────────────────────────────────────
 function ProgressBorderCard({ pct, children }) {
@@ -126,12 +238,14 @@ function WeekStrip({ programs, selectedId, onSelect }) {
   const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
   const todayIdx = new Date().getDay()
   const scrollRef = useRef(null)
+
   useEffect(() => {
     if (scrollRef.current) {
       const el = scrollRef.current.children[todayIdx]
       if (el) el.scrollIntoView({ inline: 'center', behavior: 'smooth' })
     }
   }, [])
+
   return (
     <div ref={scrollRef} style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
       {DAYS.map((day, i) => {
@@ -139,11 +253,23 @@ function WeekStrip({ programs, selectedId, onSelect }) {
         const isToday = i === todayIdx
         const isSelected = prog?.id === selectedId
         const highlighted = isSelected || (!selectedId && isToday)
+
         return (
           <div key={day} onClick={() => prog && onSelect(prog)}
-            style={{ minWidth: '148px', borderRadius: '18px', padding: '18px', background: highlighted ? WHITE : CARD, flexShrink: 0, cursor: prog ? 'pointer' : 'default', opacity: !prog ? 0.4 : 1 }}>
-            <p style={{ fontSize: '13px', color: highlighted ? '#777' : GRAY2, marginBottom: '8px', fontWeight: '500' }}>{isToday ? 'Today' : day}</p>
-            <p style={{ fontSize: '20px', fontWeight: '700', color: highlighted ? '#111' : WHITE, marginBottom: '12px', letterSpacing: '-0.3px' }}>{prog?.name || 'Rest'}</p>
+            style={{
+              minWidth: '148px', borderRadius: '18px', padding: '18px',
+              background: highlighted ? WHITE : CARD,
+              flexShrink: 0,
+              cursor: prog ? 'pointer' : 'default',
+              opacity: !prog ? 0.4 : 1,
+              transition: 'background 0.2s',
+            }}>
+            <p style={{ fontSize: '13px', color: highlighted ? '#777' : GRAY2, marginBottom: '8px', fontWeight: '500' }}>
+              {isToday ? 'Today' : day}
+            </p>
+            <p style={{ fontSize: '20px', fontWeight: '700', color: highlighted ? '#111' : WHITE, marginBottom: '12px', letterSpacing: '-0.3px' }}>
+              {prog?.name || 'Rest'}
+            </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
               <DumbbellIcon color={highlighted ? '#777' : GRAY2} size={12}/>
               <span style={{ fontSize: '12px', color: highlighted ? '#777' : GRAY2 }}>{prog?.exercises?.length || 0} Exercises</span>
@@ -202,16 +328,11 @@ function NumberPicker({ label, value, isReps, onSave, onClose }) {
   const [rangeHigh, setRangeHigh] = useState(isRange ? String(value).split('-')[1] : String(parseFloat(value||0)+2))
 
   const step = isReps ? 1 : 2.5
-
   const increment = (setter, val) => setter(String(Math.max(0, parseFloat(val||0) + step)))
   const decrement = (setter, val) => setter(String(Math.max(0, parseFloat(val||0) - step)))
 
   const handleSave = () => {
-    if (rangeMode) {
-      onSave(`${rangeLow}-${rangeHigh}`)
-    } else {
-      onSave(single)
-    }
+    onSave(rangeMode ? `${rangeLow}-${rangeHigh}` : single)
     onClose()
   }
 
@@ -222,7 +343,6 @@ function NumberPicker({ label, value, isReps, onSave, onClose }) {
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
           <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: CARD2 }}/>
         </div>
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
           <p style={{ fontSize: '16px', fontWeight: '600', color: WHITE }}>{label}</p>
           {isReps && (
@@ -232,7 +352,6 @@ function NumberPicker({ label, value, isReps, onSave, onClose }) {
             </button>
           )}
         </div>
-
         {!rangeMode ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
             <button onClick={() => decrement(setSingle, single)}
@@ -266,7 +385,6 @@ function NumberPicker({ label, value, isReps, onSave, onClose }) {
             </div>
           </div>
         )}
-
         <button onClick={handleSave} style={{ ...PILL_BTN, width: '100%', padding: '16px', fontSize: '16px' }}>
           Done <ArrowIcon />
         </button>
@@ -276,7 +394,7 @@ function NumberPicker({ label, value, isReps, onSave, onClose }) {
 }
 
 // ─── Exercise Detail Screen ───────────────────────────────────────────────────
-function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest }) {
+function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest, onDelete }) {
   const [sets, setSets] = useState(() => {
     if (log?.weight_used && log?.reps_done) {
       return [{ weight: String(log.weight_used), reps: String(log.reps_done), done: !!log.done }]
@@ -284,7 +402,7 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest 
     return [{ weight: String(lastLog?.weight_used || ex.weight || ''), reps: String(ex.reps || ''), done: false }]
   })
   const [notes, setNotes] = useState(log?.notes || '')
-  const [picker, setPicker] = useState(null) // { setIdx, field }
+  const [picker, setPicker] = useState(null)
 
   const openPicker = (setIdx, field) => setPicker({ setIdx, field })
 
@@ -304,6 +422,10 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest 
     }
   }
 
+  const deleteSet = (idx) => {
+    setSets(prev => prev.filter((_,i) => i !== idx))
+  }
+
   const addSet = () => {
     const last = sets[sets.length - 1]
     setSets(prev => [...prev, { weight: last?.weight || '', reps: last?.reps || ex.reps || '', done: false }])
@@ -313,7 +435,10 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest 
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: BG, overflowY: 'auto', animation: 'slideInRight 0.25s cubic-bezier(0.32,0.72,0,1)' }}>
-      <style>{`@keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}} @keyframes slideOutRight{from{transform:translateX(0)}to{transform:translateX(100%)}}`}</style>
+      <style>{`
+        @keyframes slideInRight { from { transform: translateX(100%) } to { transform: translateX(0) } }
+        @keyframes slideOutRight { from { transform: translateX(0) } to { transform: translateX(100%) } }
+      `}</style>
 
       {/* Top bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '56px 20px 20px' }}>
@@ -339,23 +464,25 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest 
         </div>
       )}
 
-      {/* Set rows */}
+      {/* Set rows — swipe to delete */}
       <div style={{ padding: '0 20px' }}>
         {sets.map((s, idx) => (
-          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px' }}>
-            <div onClick={() => toggleSetDone(idx)}
-              style={{ width: '44px', height: '44px', borderRadius: '12px', flexShrink: 0, background: s.done ? WHITE : CARD2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}>
-              {s.done && <CheckIcon size={20} color="#111"/>}
+          <SwipeableRow key={idx} onDelete={() => deleteSet(idx)} bgColor={BG}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px' }}>
+              <div onClick={() => toggleSetDone(idx)}
+                style={{ width: '44px', height: '44px', borderRadius: '12px', flexShrink: 0, background: s.done ? WHITE : CARD2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}>
+                {s.done && <CheckIcon size={20} color="#111"/>}
+              </div>
+              <div onClick={() => openPicker(idx, 'weight')}
+                style={{ background: CARD2, borderRadius: '100px', padding: '10px 18px', cursor: 'pointer', textAlign: 'center' }}>
+                <span style={{ fontSize: '15px', fontWeight: '600', color: WHITE }}>{s.weight || '—'} lbs</span>
+              </div>
+              <div onClick={() => openPicker(idx, 'reps')}
+                style={{ background: CARD2, borderRadius: '100px', padding: '10px 18px', cursor: 'pointer', textAlign: 'center' }}>
+                <span style={{ fontSize: '15px', fontWeight: '600', color: WHITE }}>{s.reps || '—'} reps</span>
+              </div>
             </div>
-            <div onClick={() => openPicker(idx, 'weight')}
-              style={{ background: CARD2, borderRadius: '100px', padding: '10px 18px', cursor: 'pointer', textAlign: 'center' }}>
-              <span style={{ fontSize: '15px', fontWeight: '600', color: WHITE }}>{s.weight || '—'} lbs</span>
-            </div>
-            <div onClick={() => openPicker(idx, 'reps')}
-              style={{ background: CARD2, borderRadius: '100px', padding: '10px 18px', cursor: 'pointer', textAlign: 'center' }}>
-              <span style={{ fontSize: '15px', fontWeight: '600', color: WHITE }}>{s.reps || '—'} reps</span>
-            </div>
-          </div>
+          </SwipeableRow>
         ))}
 
         {/* Add set */}
@@ -369,10 +496,20 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest 
 
       {/* Divider + notes */}
       <div style={{ height: '1px', background: CARD2 }}/>
-      <div style={{ padding: '20px 20px calc(80px + env(safe-area-inset-bottom))' }}>
+      <div style={{ padding: '20px' }}>
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Type anything..."
-          rows={6} style={{ width: '100%', background: 'transparent', border: 'none', color: WHITE, fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', resize: 'none', lineHeight: '1.6', boxSizing: 'border-box' }}/>
+          rows={4} style={{ width: '100%', background: 'transparent', border: 'none', color: WHITE, fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', resize: 'none', lineHeight: '1.6', boxSizing: 'border-box' }}/>
       </div>
+
+      {/* Delete exercise */}
+      {onDelete && (
+        <div style={{ padding: '0 20px calc(80px + env(safe-area-inset-bottom))' }}>
+          <button onClick={onDelete}
+            style={{ width: '100%', padding: '16px', borderRadius: '14px', background: 'rgba(239,68,68,0.08)', border: 'none', color: '#EF4444', fontSize: '15px', fontWeight: '600', fontFamily: 'Inter, sans-serif', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <TrashIcon size={16} color="#EF4444"/> Remove exercise
+          </button>
+        </div>
+      )}
 
       {/* Number picker */}
       {picker && (
@@ -407,7 +544,6 @@ function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
 
   const handleSelectExercise = async (ex) => {
     if (ex.isMine) { onClose(); return }
-    // Add standard exercise to this program
     setSaving(true)
     await supabase.from('exercises').insert({
       name: ex.name, sets: 4, reps: '8-10', weight: '', rest_seconds: 90, program_id: programId
@@ -431,7 +567,7 @@ function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: BG, display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s cubic-bezier(0.32,0.72,0,1)' }}>
-      <style>{`@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
+      <style>{`@keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }`}</style>
 
       {/* Top bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '56px 20px 16px', flexShrink: 0 }}>
@@ -511,6 +647,12 @@ function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, 
   const allExercises = prog.exercises
   const doneCnt = allExercises.filter(e => todayLogs[e.id]?.done).length
 
+  const handleDeleteExercise = async (ex) => {
+    await supabase.from('exercises').delete().eq('id', ex.id)
+    setActiveEx(null)
+    onRefresh()
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: BG, zIndex: 150, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
 
@@ -536,29 +678,34 @@ function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, 
         <p style={{ fontSize: '15px', color: GRAY, marginTop: '8px' }}>{prog.name} · <span style={{ color: doneCnt === allExercises.length ? '#10B981' : GRAY }}>In progress</span></p>
       </div>
 
-      {/* Exercise list */}
+      {/* Exercise list — swipe to delete */}
       <div style={{ padding: '0 20px calc(80px + env(safe-area-inset-bottom))', flex: 1 }}>
         {allExercises.map((ex, idx) => {
           const log = todayLogs[ex.id] || {}
           const isDone = !!log.done
           return (
             <div key={ex.id}>
-              <div onClick={() => setActiveEx(ex)} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 0', cursor: 'pointer' }}>
-                <div onClick={e => { e.stopPropagation(); onToggleDone(ex) }}
-                  style={{ width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0, background: isDone ? WHITE : 'transparent', border: `2px solid ${isDone ? WHITE : '#333'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-                  {isDone && <CheckIcon size={18} color="#111"/>}
+              <SwipeableRow
+                bgColor={BG}
+                onDelete={() => handleDeleteExercise(ex)}
+              >
+                <div onClick={() => setActiveEx(ex)} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 0', cursor: 'pointer' }}>
+                  <div onClick={e => { e.stopPropagation(); onToggleDone(ex) }}
+                    style={{ width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0, background: isDone ? WHITE : 'transparent', border: `2px solid ${isDone ? WHITE : '#333'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+                    {isDone && <CheckIcon size={18} color="#111"/>}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: '17px', fontWeight: '600', color: isDone ? GRAY : WHITE, textDecoration: isDone ? 'line-through' : 'none' }}>{ex.name}</p>
+                    <p style={{ fontSize: '13px', color: GRAY2, marginTop: '3px' }}>
+                      {isDone
+                        ? <span style={{ color: GRAY }}>All sets completed{log.weight_used ? ` · ${log.weight_used} lbs` : ''}</span>
+                        : `${ex.sets} sets · ${ex.reps} reps`
+                      }
+                    </p>
+                  </div>
+                  <ChevronRight color={GRAY2}/>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: '17px', fontWeight: '600', color: isDone ? GRAY : WHITE, textDecoration: isDone ? 'line-through' : 'none' }}>{ex.name}</p>
-                  <p style={{ fontSize: '13px', color: GRAY2, marginTop: '3px' }}>
-                    {isDone
-                      ? <span style={{ color: GRAY }}>All sets completed{log.weight_used ? ` · ${log.weight_used} lbs` : ''}</span>
-                      : `${ex.sets} sets · ${ex.reps} reps`
-                    }
-                  </p>
-                </div>
-                <ChevronRight color={GRAY2}/>
-              </div>
+              </SwipeableRow>
               {idx < allExercises.length - 1 && (
                 <div style={{ marginLeft: '22px', width: '2px', height: '16px', background: '#222', borderRadius: '1px' }}/>
               )}
@@ -575,7 +722,7 @@ function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, 
         </div>
       </div>
 
-      {/* Exercise detail — slides in on top */}
+      {/* Exercise detail */}
       {activeEx && (
         <ExerciseDetailScreen
           ex={activeEx}
@@ -584,6 +731,7 @@ function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, 
           onBack={() => setActiveEx(null)}
           onLogSet={(exId, w, r, n) => onLogSet(exId, w, r, n)}
           onStartRest={onStartRest}
+          onDelete={() => handleDeleteExercise(activeEx)}
         />
       )}
 
@@ -844,14 +992,13 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', flexDirection: 'column', gap: '16px' }}>
       <div style={{ width: '36px', height: '36px', borderRadius: '50%', border: `3px solid ${CARD2}`, borderTop: `3px solid ${WHITE}`, animation: 'spin 1s linear infinite' }}/>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 
   return (
     <div style={{ padding: '56px 20px calc(100px + env(safe-area-inset-bottom))', background: BG, minHeight: '100dvh', boxSizing: 'border-box' }}>
 
-      {/* Active workout overlay — back arrow hides it but timer keeps running */}
       {workoutActive && showWorkout && prog && (
         <ActiveWorkoutScreen
           prog={prog}
