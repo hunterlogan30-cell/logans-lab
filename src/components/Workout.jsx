@@ -626,13 +626,18 @@ function NumberPicker({ label, value, isReps, onSave, onClose }) {
           <div style={{ marginBottom: '28px' }}>
             <p style={{ fontSize: '12px', color: GRAY, marginBottom: '12px', textAlign: 'center' }}>LOW — HIGH</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {[[rangeLow, setRangeLow], [rangeHigh, setRangeHigh]].map(([v, s], i) => (
-                <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <button onClick={() => dec(s, v)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-                  <input type="number" value={v} onChange={e => s(e.target.value)} style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '56px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', textAlign: 'center', width: '100px' }}/>
-                  <button onClick={() => inc(s, v)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
-                </div>
-              )).reduce((acc, el, i) => i === 0 ? [el] : [...acc, <span key="sep" style={{ fontSize: '32px', color: GRAY, fontWeight: '300' }}>—</span>, el], [])}
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <button onClick={() => dec(setRangeLow, rangeLow)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                <input type="number" value={rangeLow} onChange={e => setRangeLow(e.target.value)} style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '56px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', textAlign: 'center', width: '100px' }}/>
+                <button onClick={() => inc(setRangeLow, rangeLow)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+              </div>
+              <span style={{ fontSize: '32px', color: GRAY, fontWeight: '300' }}>—</span>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <button onClick={() => dec(setRangeHigh, rangeHigh)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                <input type="number" value={rangeHigh} onChange={e => setRangeHigh(e.target.value)} style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '56px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', textAlign: 'center', width: '100px' }}/>
+                <button onClick={() => inc(setRangeHigh, rangeHigh)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+              </div>
+            </div>
             </div>
           </div>
         )}
