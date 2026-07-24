@@ -356,10 +356,10 @@ function WeekStrip({ programs, selectedDayOfWeek, onSelect, onAddProgram, onDele
     if (Math.abs(dy) > 8) cancelPress()
     if (deletingDow === dow) { liveY.current = Math.max(0, dy); setSwipeY(Math.max(0, dy)) }
   }
-  const onCardTouchEnd = (dow) => {
+  const onCardTouchEnd = (dow, prog) => {
     cancelPress()
     if (deletingDow === dow) {
-      if (liveY.current >= COMMIT_Y) { vibrate([40, 20, 60]); onDeleteProgram(dow) }
+      if (liveY.current >= COMMIT_Y) { vibrate([40, 20, 60]); onDeleteProgram(prog) }
       setDeletingDow(null); setSwipeY(0); liveY.current = 0
     }
   }
@@ -389,7 +389,7 @@ function WeekStrip({ programs, selectedDayOfWeek, onSelect, onAddProgram, onDele
             <div
               onTouchStart={e => prog && onCardTouchStart(e, dow)}
               onTouchMove={e => onCardTouchMove(e, dow)}
-              onTouchEnd={() => onCardTouchEnd(dow)}
+              onTouchEnd={() => onCardTouchEnd(dow, prog)}
               onClick={() => { if (!isDeleting && prog) onSelect(prog, dow) }}
               style={{
                 width: '100%',
@@ -1119,7 +1119,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
               selectedDayOfWeek={selectedDayOfWeek}
               onSelect={handleSelectProgram}
               onAddProgram={() => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setActiveSheet('prog') }}
-              onDeleteProgram={(dow) => { const p = programs[dow % programs.length]; if (p) setConfirmDeleteProg(p) }}
+              onDeleteProgram={(prog) => { if (prog) setConfirmDeleteProg(prog) }}
             />
           </div>
 
