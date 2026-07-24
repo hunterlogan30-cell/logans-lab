@@ -393,11 +393,13 @@ function WeekStrip({ programs, selectedDayOfWeek, onSelect, onAddProgram, onDele
               onClick={() => { if (!isDeleting && prog) onSelect(prog, dow) }}
               style={{
                 width: '100%',
+                minHeight: '152px',
                 borderRadius: '18px',
                 padding: '18px',
                 background: isSelected ? WHITE : CARD,
                 cursor: prog ? 'pointer' : 'default',
                 opacity: !prog ? 0.4 : 1,
+                boxSizing: 'border-box',
                 transform: isDeleting
                   ? `scale(0.9) translateY(${Math.min(swipeY * 0.55, 48)}px)`
                   : 'scale(1) translateY(0px)',
