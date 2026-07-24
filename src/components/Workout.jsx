@@ -85,27 +85,58 @@ const SearchIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GRAY} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 )
 const TrashIcon = ({ color = '#EF4444', size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
 )
 
-// ─── Swipeable Row ────────────────────────────────────────────────────────────
-function SwipeableRow({ onDelete, children, bgColor = BG }) {
-  const [offsetX, setOffsetX] = useState(0)
-  const [dragging, setDragging] = useState(false)
-  const startX = useRef(0)
-  const startY = useRef(0)
-  const liveOffset = useRef(0)
-  const lastVibrateAt = useRef(0)
-  const isScrolling = useRef(null)
+// ─── Confirm Delete Modal ─────────────────────────────────────────────────────
+function ConfirmDeleteModal({ title, subtitle, onConfirm, onCancel }) {
+  return (
+    <>
+      <div onClick={onCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 700, backdropFilter: 'blur(6px)' }}/>
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 701, background: '#1c1c1c', borderRadius: '24px 24px 0 0', padding: '32px 20px calc(44px + env(safe-area-inset-bottom))' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <TrashIcon size={24} color="#EF4444"/>
+          </div>
+        </div>
+        <p style={{ fontSize: '20px', fontWeight: '700', color: WHITE, textAlign: 'center', marginBottom: '8px' }}>{title}</p>
+        <p style={{ fontSize: '14px', color: GRAY, textAlign: 'center', marginBottom: '32px', lineHeight: 1.6 }}>{subtitle}</p>
+        <button onClick={onConfirm}
+          style={{ width: '100%', padding: '16px', borderRadius: '14px', background: '#EF4444', border: 'none', color: WHITE, fontSize: '16px', fontWeight: '700', fontFamily: 'Inter, sans-serif', cursor: 'pointer', marginBottom: '10px' }}>
+          Delete
+        </button>
+        <button onClick={onCancel} style={{ ...GHOST_BTN, width: '100%', padding: '14px', fontSize: '15px', textAlign: 'center' }}>
+          Cancel
+        </button>
+      </div>
+    </>
+  )
+}
 
-  const SHOW   = 12
-  const RED    = 72
-  const COMMIT = 130
+// ─── Swipeable Exercise Row ───────────────────────────────────────────────────
+// Circle morphs to trash on swipe. Release past threshold → confirm dialog.
+function SwipeableExerciseRow({ ex, isDone, onTap, onToggleDone, onDeleteIntent }) {
+  const [offsetX, setOffsetX]   = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const startX      = useRef(0)
+  const startY      = useRef(0)
+  const liveOffset  = useRef(0)
+  const maxSwipe    = useRef(0) // used to suppress click after swipe
+  const isScrolling = useRef(null)
+  const vibratedAt  = useRef(0)
+
+  const MORPH_START = 18   // circle starts transforming
+  const COMMIT      = 110  // release here triggers delete intent
+
+  const morphPct   = Math.min(Math.max((offsetX - MORPH_START) / (COMMIT - MORPH_START), 0), 1)
+  const showTrash  = offsetX >= MORPH_START
+  const pastCommit = offsetX >= COMMIT
 
   const onTouchStart = (e) => {
     startX.current = e.touches[0].clientX
     startY.current = e.touches[0].clientY
     isScrolling.current = null
+    maxSwipe.current = 0
     setDragging(true)
   }
 
@@ -113,85 +144,210 @@ function SwipeableRow({ onDelete, children, bgColor = BG }) {
     const dx = startX.current - e.touches[0].clientX
     const dy = Math.abs(e.touches[0].clientY - startY.current)
 
-    // Detect scroll vs swipe on first significant movement
     if (isScrolling.current === null) {
       if (Math.abs(dx) < 5 && dy < 5) return
       isScrolling.current = dy > Math.abs(dx)
     }
-
-    // If scrolling vertically, ignore horizontal
     if (isScrolling.current) return
+
+    maxSwipe.current = Math.max(maxSwipe.current, Math.abs(dx))
 
     if (dx <= 0) { liveOffset.current = 0; setOffsetX(0); return }
 
-    // Rubber band past commit
-    const clamped = dx < COMMIT ? dx : COMMIT + (dx - COMMIT) * 0.15
+    // Rubber-band past commit
+    const clamped = dx < COMMIT ? dx : COMMIT + (dx - COMMIT) * 0.18
     liveOffset.current = clamped
     setOffsetX(clamped)
 
-    if (dx >= RED) {
+    // Vibrate once when crossing commit threshold
+    if (dx >= COMMIT) {
       const now = Date.now()
-      if (now - lastVibrateAt.current > 250) {
-        vibrate([15])
-        lastVibrateAt.current = now
+      if (now - vibratedAt.current > 400) {
+        vibrate([20])
+        vibratedAt.current = now
       }
     }
   }
 
   const onTouchEnd = () => {
     setDragging(false)
-    if (liveOffset.current >= COMMIT) {
-      vibrate([60, 30, 100])
-      onDelete()
-    } else {
-      setOffsetX(0)
-    }
+    const didCommit = liveOffset.current >= COMMIT
+    setOffsetX(0)
     liveOffset.current = 0
+    if (didCommit) {
+      vibrate([50, 30, 80])
+      onDeleteIntent()
+    }
   }
 
-  const pastRed  = offsetX >= RED
-  const visible  = offsetX >= SHOW
+  const handleRowClick = () => {
+    if (maxSwipe.current > 10) return // suppress click after any meaningful swipe
+    onTap()
+  }
+
+  const handleCircleClick = (e) => {
+    e.stopPropagation()
+    if (maxSwipe.current > 10) return
+    onToggleDone()
+  }
+
+  // Circle colors
+  const circleBg     = showTrash ? `rgba(239,68,68,${0.08 + morphPct * 0.12})` : (isDone ? WHITE : 'transparent')
+  const circleBorder = showTrash ? `2px solid rgba(239,68,68,${0.4 + morphPct * 0.6})` : `2px solid ${isDone ? WHITE : '#333'}`
 
   return (
-    <div style={{ position: 'relative', overflow: 'hidden' }}>
-      <style>{`
-        @keyframes trashShake {
-          0%,100% { transform: rotate(0deg) scale(1); }
-          20%      { transform: rotate(-18deg) scale(1.15); }
-          50%      { transform: rotate(14deg) scale(1.2); }
-          80%      { transform: rotate(-10deg) scale(1.15); }
-        }
-      `}</style>
-
-      {/* Trash reveal */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-        paddingRight: '24px',
-        opacity: visible ? 1 : 0,
-        transition: dragging ? 'none' : 'opacity 0.2s',
-      }}>
-        <div style={{
-          animation: pastRed ? 'trashShake 0.3s ease infinite' : 'none',
-          transition: 'color 0.15s',
-        }}>
-          <TrashIcon color={pastRed ? '#EF4444' : GRAY2} size={22} />
-        </div>
-      </div>
-
-      {/* Sliding content */}
+    <div
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onClick={handleRowClick}
+      style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 0', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none' }}
+    >
+      {/* Circle → Trash */}
       <div
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
+        onClick={handleCircleClick}
         style={{
-          transform: `translateX(-${offsetX}px)`,
-          transition: dragging ? 'none' : 'transform 0.35s cubic-bezier(0.32,0.72,0,1)',
-          willChange: 'transform',
-          background: bgColor,
+          width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0,
+          background: circleBg,
+          border: circleBorder,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: dragging ? 'none' : 'all 0.25s',
         }}
       >
-        {children}
+        {showTrash
+          ? <TrashIcon size={18} color={`rgba(239,68,68,${0.5 + morphPct * 0.5})`}/>
+          : isDone
+            ? <CheckIcon size={18} color="#111"/>
+            : null
+        }
+      </div>
+
+      {/* Text */}
+      <div style={{ flex: 1, pointerEvents: 'none' }}>
+        <p style={{ fontSize: '17px', fontWeight: '600', color: isDone ? GRAY : WHITE, textDecoration: isDone ? 'line-through' : 'none' }}>{ex.name}</p>
+        <p style={{ fontSize: '13px', color: GRAY2, marginTop: '3px' }}>
+          {isDone
+            ? <span style={{ color: GRAY }}>Completed{ex._log?.weight_used ? ` · ${ex._log.weight_used} lbs` : ''}</span>
+            : `${ex.sets} sets · ${ex.reps} reps`
+          }
+        </p>
+      </div>
+
+      <ChevronRight color={GRAY2}/>
+    </div>
+  )
+}
+
+// ─── Swipeable Set Row ────────────────────────────────────────────────────────
+// Same pattern: swipe left → circle morphs to trash → release → confirm.
+function SwipeableSetRow({ setData, idx, onToggleDone, onOpenPicker, onDeleteIntent }) {
+  const [offsetX, setOffsetX]   = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const startX      = useRef(0)
+  const startY      = useRef(0)
+  const liveOffset  = useRef(0)
+  const maxSwipe    = useRef(0)
+  const isScrolling = useRef(null)
+  const vibratedAt  = useRef(0)
+
+  const MORPH_START = 18
+  const COMMIT      = 110
+
+  const morphPct   = Math.min(Math.max((offsetX - MORPH_START) / (COMMIT - MORPH_START), 0), 1)
+  const showTrash  = offsetX >= MORPH_START
+  const pastCommit = offsetX >= COMMIT
+
+  const onTouchStart = (e) => {
+    startX.current = e.touches[0].clientX
+    startY.current = e.touches[0].clientY
+    isScrolling.current = null
+    maxSwipe.current = 0
+    setDragging(true)
+  }
+
+  const onTouchMove = (e) => {
+    const dx = startX.current - e.touches[0].clientX
+    const dy = Math.abs(e.touches[0].clientY - startY.current)
+
+    if (isScrolling.current === null) {
+      if (Math.abs(dx) < 5 && dy < 5) return
+      isScrolling.current = dy > Math.abs(dx)
+    }
+    if (isScrolling.current) return
+
+    maxSwipe.current = Math.max(maxSwipe.current, Math.abs(dx))
+
+    if (dx <= 0) { liveOffset.current = 0; setOffsetX(0); return }
+
+    const clamped = dx < COMMIT ? dx : COMMIT + (dx - COMMIT) * 0.18
+    liveOffset.current = clamped
+    setOffsetX(clamped)
+
+    if (dx >= COMMIT) {
+      const now = Date.now()
+      if (now - vibratedAt.current > 400) {
+        vibrate([20])
+        vibratedAt.current = now
+      }
+    }
+  }
+
+  const onTouchEnd = () => {
+    setDragging(false)
+    const didCommit = liveOffset.current >= COMMIT
+    setOffsetX(0)
+    liveOffset.current = 0
+    if (didCommit) {
+      vibrate([50, 30, 80])
+      onDeleteIntent(idx)
+    }
+  }
+
+  const handleCircleClick = () => {
+    if (maxSwipe.current > 10) return
+    onToggleDone(idx)
+  }
+
+  const circleBg     = showTrash ? `rgba(239,68,68,${0.08 + morphPct * 0.12})` : (setData.done ? WHITE : CARD2)
+  const circleBorder = showTrash ? `2px solid rgba(239,68,68,${0.4 + morphPct * 0.6})` : (setData.done ? `2px solid ${WHITE}` : 'none')
+
+  return (
+    <div
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px', userSelect: 'none', WebkitUserSelect: 'none' }}
+    >
+      {/* Circle → Trash */}
+      <div
+        onClick={handleCircleClick}
+        style={{
+          width: '44px', height: '44px', borderRadius: '12px', flexShrink: 0,
+          background: circleBg,
+          border: circleBorder,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer',
+          transition: dragging ? 'none' : 'all 0.25s',
+        }}
+      >
+        {showTrash
+          ? <TrashIcon size={18} color={`rgba(239,68,68,${0.5 + morphPct * 0.5})`}/>
+          : setData.done
+            ? <CheckIcon size={20} color="#111"/>
+            : null
+        }
+      </div>
+
+      <div
+        onClick={() => { if (maxSwipe.current <= 10) onOpenPicker(idx, 'weight') }}
+        style={{ background: CARD2, borderRadius: '100px', padding: '10px 18px', cursor: 'pointer', textAlign: 'center' }}>
+        <span style={{ fontSize: '15px', fontWeight: '600', color: WHITE }}>{setData.weight || '—'} lbs</span>
+      </div>
+
+      <div
+        onClick={() => { if (maxSwipe.current <= 10) onOpenPicker(idx, 'reps') }}
+        style={{ background: CARD2, borderRadius: '100px', padding: '10px 18px', cursor: 'pointer', textAlign: 'center' }}>
+        <span style={{ fontSize: '15px', fontWeight: '600', color: WHITE }}>{setData.reps || '—'} reps</span>
       </div>
     </div>
   )
@@ -256,20 +412,9 @@ function WeekStrip({ programs, selectedId, onSelect }) {
 
         return (
           <div key={day} onClick={() => prog && onSelect(prog)}
-            style={{
-              minWidth: '148px', borderRadius: '18px', padding: '18px',
-              background: highlighted ? WHITE : CARD,
-              flexShrink: 0,
-              cursor: prog ? 'pointer' : 'default',
-              opacity: !prog ? 0.4 : 1,
-              transition: 'background 0.2s',
-            }}>
-            <p style={{ fontSize: '13px', color: highlighted ? '#777' : GRAY2, marginBottom: '8px', fontWeight: '500' }}>
-              {isToday ? 'Today' : day}
-            </p>
-            <p style={{ fontSize: '20px', fontWeight: '700', color: highlighted ? '#111' : WHITE, marginBottom: '12px', letterSpacing: '-0.3px' }}>
-              {prog?.name || 'Rest'}
-            </p>
+            style={{ minWidth: '148px', borderRadius: '18px', padding: '18px', background: highlighted ? WHITE : CARD, flexShrink: 0, cursor: prog ? 'pointer' : 'default', opacity: !prog ? 0.4 : 1, transition: 'background 0.2s' }}>
+            <p style={{ fontSize: '13px', color: highlighted ? '#777' : GRAY2, marginBottom: '8px', fontWeight: '500' }}>{isToday ? 'Today' : day}</p>
+            <p style={{ fontSize: '20px', fontWeight: '700', color: highlighted ? '#111' : WHITE, marginBottom: '12px', letterSpacing: '-0.3px' }}>{prog?.name || 'Rest'}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
               <DumbbellIcon color={highlighted ? '#777' : GRAY2} size={12}/>
               <span style={{ fontSize: '12px', color: highlighted ? '#777' : GRAY2 }}>{prog?.exercises?.length || 0} Exercises</span>
@@ -354,40 +499,32 @@ function NumberPicker({ label, value, isReps, onSave, onClose }) {
         </div>
         {!rangeMode ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
-            <button onClick={() => decrement(setSingle, single)}
-              style={{ width: '56px', height: '56px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>−</button>
+            <button onClick={() => decrement(setSingle, single)} style={{ width: '56px', height: '56px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>−</button>
             <input type="number" value={single} onChange={e => setSingle(e.target.value)} autoFocus
               style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '72px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', textAlign: 'center', width: '200px', letterSpacing: '-2px' }}/>
-            <button onClick={() => increment(setSingle, single)}
-              style={{ width: '56px', height: '56px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>+</button>
+            <button onClick={() => increment(setSingle, single)} style={{ width: '56px', height: '56px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>+</button>
           </div>
         ) : (
           <div style={{ marginBottom: '28px' }}>
             <p style={{ fontSize: '12px', color: GRAY, marginBottom: '12px', textAlign: 'center' }}>LOW — HIGH</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <button onClick={() => decrement(setRangeLow, rangeLow)}
-                  style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                <button onClick={() => decrement(setRangeLow, rangeLow)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                 <input type="number" value={rangeLow} onChange={e => setRangeLow(e.target.value)}
                   style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '56px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', textAlign: 'center', width: '100px' }}/>
-                <button onClick={() => increment(setRangeLow, rangeLow)}
-                  style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                <button onClick={() => increment(setRangeLow, rangeLow)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
               </div>
               <span style={{ fontSize: '32px', color: GRAY, fontWeight: '300' }}>—</span>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <button onClick={() => decrement(setRangeHigh, rangeHigh)}
-                  style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                <button onClick={() => decrement(setRangeHigh, rangeHigh)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                 <input type="number" value={rangeHigh} onChange={e => setRangeHigh(e.target.value)}
                   style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '56px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', textAlign: 'center', width: '100px' }}/>
-                <button onClick={() => increment(setRangeHigh, rangeHigh)}
-                  style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                <button onClick={() => increment(setRangeHigh, rangeHigh)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
               </div>
             </div>
           </div>
         )}
-        <button onClick={handleSave} style={{ ...PILL_BTN, width: '100%', padding: '16px', fontSize: '16px' }}>
-          Done <ArrowIcon />
-        </button>
+        <button onClick={handleSave} style={{ ...PILL_BTN, width: '100%', padding: '16px', fontSize: '16px' }}>Done <ArrowIcon /></button>
       </div>
     </>
   )
@@ -401,8 +538,9 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
     }
     return [{ weight: String(lastLog?.weight_used || ex.weight || ''), reps: String(ex.reps || ''), done: false }]
   })
-  const [notes, setNotes] = useState(log?.notes || '')
-  const [picker, setPicker] = useState(null)
+  const [notes, setNotes]           = useState(log?.notes || '')
+  const [picker, setPicker]         = useState(null)
+  const [confirmSet, setConfirmSet] = useState(null) // idx of set pending delete
 
   const openPicker = (setIdx, field) => setPicker({ setIdx, field })
 
@@ -422,8 +560,11 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
     }
   }
 
-  const deleteSet = (idx) => {
-    setSets(prev => prev.filter((_,i) => i !== idx))
+  const confirmDeleteSet = (idx) => setConfirmSet(idx)
+
+  const deleteSet = () => {
+    setSets(prev => prev.filter((_,i) => i !== confirmSet))
+    setConfirmSet(null)
   }
 
   const addSet = () => {
@@ -435,10 +576,7 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: BG, overflowY: 'auto', animation: 'slideInRight 0.25s cubic-bezier(0.32,0.72,0,1)' }}>
-      <style>{`
-        @keyframes slideInRight { from { transform: translateX(100%) } to { transform: translateX(0) } }
-        @keyframes slideOutRight { from { transform: translateX(0) } to { transform: translateX(100%) } }
-      `}</style>
+      <style>{`@keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
 
       {/* Top bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '56px 20px 20px' }}>
@@ -467,22 +605,14 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
       {/* Set rows — swipe to delete */}
       <div style={{ padding: '0 20px' }}>
         {sets.map((s, idx) => (
-          <SwipeableRow key={idx} onDelete={() => deleteSet(idx)} bgColor={BG}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px' }}>
-              <div onClick={() => toggleSetDone(idx)}
-                style={{ width: '44px', height: '44px', borderRadius: '12px', flexShrink: 0, background: s.done ? WHITE : CARD2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}>
-                {s.done && <CheckIcon size={20} color="#111"/>}
-              </div>
-              <div onClick={() => openPicker(idx, 'weight')}
-                style={{ background: CARD2, borderRadius: '100px', padding: '10px 18px', cursor: 'pointer', textAlign: 'center' }}>
-                <span style={{ fontSize: '15px', fontWeight: '600', color: WHITE }}>{s.weight || '—'} lbs</span>
-              </div>
-              <div onClick={() => openPicker(idx, 'reps')}
-                style={{ background: CARD2, borderRadius: '100px', padding: '10px 18px', cursor: 'pointer', textAlign: 'center' }}>
-                <span style={{ fontSize: '15px', fontWeight: '600', color: WHITE }}>{s.reps || '—'} reps</span>
-              </div>
-            </div>
-          </SwipeableRow>
+          <SwipeableSetRow
+            key={idx}
+            setData={s}
+            idx={idx}
+            onToggleDone={toggleSetDone}
+            onOpenPicker={openPicker}
+            onDeleteIntent={confirmDeleteSet}
+          />
         ))}
 
         {/* Add set */}
@@ -496,19 +626,19 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
 
       {/* Divider + notes */}
       <div style={{ height: '1px', background: CARD2 }}/>
-      <div style={{ padding: '20px' }}>
+      <div style={{ padding: '20px 20px calc(100px + env(safe-area-inset-bottom))' }}>
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Type anything..."
           rows={4} style={{ width: '100%', background: 'transparent', border: 'none', color: WHITE, fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', resize: 'none', lineHeight: '1.6', boxSizing: 'border-box' }}/>
       </div>
 
-      {/* Delete exercise */}
-      {onDelete && (
-        <div style={{ padding: '0 20px calc(80px + env(safe-area-inset-bottom))' }}>
-          <button onClick={onDelete}
-            style={{ width: '100%', padding: '16px', borderRadius: '14px', background: 'rgba(239,68,68,0.08)', border: 'none', color: '#EF4444', fontSize: '15px', fontWeight: '600', fontFamily: 'Inter, sans-serif', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            <TrashIcon size={16} color="#EF4444"/> Remove exercise
-          </button>
-        </div>
+      {/* Confirm delete set */}
+      {confirmSet !== null && (
+        <ConfirmDeleteModal
+          title="Delete this set?"
+          subtitle="All data for this set will be lost."
+          onConfirm={deleteSet}
+          onCancel={() => setConfirmSet(null)}
+        />
       )}
 
       {/* Number picker */}
@@ -545,45 +675,31 @@ function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
   const handleSelectExercise = async (ex) => {
     if (ex.isMine) { onClose(); return }
     setSaving(true)
-    await supabase.from('exercises').insert({
-      name: ex.name, sets: 4, reps: '8-10', weight: '', rest_seconds: 90, program_id: programId
-    })
+    await supabase.from('exercises').insert({ name: ex.name, sets: 4, reps: '8-10', weight: '', rest_seconds: 90, program_id: programId })
     setSaving(false)
-    onAdded()
-    onClose()
+    onAdded(); onClose()
   }
 
   const handleCreateNew = async () => {
     if (!newName.trim()) return
     setSaving(true)
-    await supabase.from('exercises').insert({
-      name: newName, sets: parseInt(newSets)||4, reps: newReps,
-      weight: newWeight, rest_seconds: 90, program_id: programId
-    })
+    await supabase.from('exercises').insert({ name: newName, sets: parseInt(newSets)||4, reps: newReps, weight: newWeight, rest_seconds: 90, program_id: programId })
     setSaving(false)
-    onAdded()
-    onClose()
+    onAdded(); onClose()
   }
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: BG, display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s cubic-bezier(0.32,0.72,0,1)' }}>
-      <style>{`@keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }`}</style>
+      <style>{`@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
 
-      {/* Top bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '56px 20px 16px', flexShrink: 0 }}>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
-          <BackIcon />
-        </button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}><BackIcon /></button>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => setAdding(a => !a)}
-            style={{ width: '40px', height: '40px', borderRadius: '50%', background: CARD2, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <PlusIcon size={18} color={WHITE}/>
-          </button>
+          <button onClick={() => setAdding(a => !a)} style={{ width: '40px', height: '40px', borderRadius: '50%', background: CARD2, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><PlusIcon size={18} color={WHITE}/></button>
           <button onClick={onClose} style={{ ...GHOST_BTN, padding: '10px 20px' }}>Done</button>
         </div>
       </div>
 
-      {/* Search */}
       <div style={{ padding: '0 20px 16px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: CARD2, borderRadius: '100px', padding: '12px 18px' }}>
           <SearchIcon />
@@ -593,7 +709,6 @@ function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
         </div>
       </div>
 
-      {/* New exercise form */}
       {adding && (
         <div style={{ padding: '12px 20px 16px', flexShrink: 0, background: CARD2, marginBottom: '2px' }}>
           <p style={{ fontSize: '12px', color: GRAY, marginBottom: '10px', fontWeight: '500' }}>NEW EXERCISE</p>
@@ -614,13 +729,11 @@ function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
         </div>
       )}
 
-      {/* Library header */}
       <div style={{ padding: '16px 20px 8px', flexShrink: 0 }}>
         <h2 style={{ fontSize: '28px', fontWeight: '800', color: WHITE, letterSpacing: '-0.5px' }}>Library</h2>
         <p style={{ fontSize: '13px', color: GRAY, marginTop: '4px' }}>{filtered.length} exercises{search ? ` matching "${search}"` : ''}</p>
       </div>
 
-      {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
         {filtered.map((ex, i) => (
           <div key={ex.id || ex.name} onClick={() => handleSelectExercise(ex)}
@@ -642,14 +755,17 @@ function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
 
 // ─── Active Workout Screen ────────────────────────────────────────────────────
 function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, onToggle, onBack, onFinish, onLogSet, onToggleDone, onStartRest, onRefresh }) {
-  const [activeEx, setActiveEx] = useState(null)
-  const [showLibrary, setShowLibrary] = useState(false)
+  const [activeEx,     setActiveEx]     = useState(null)
+  const [showLibrary,  setShowLibrary]  = useState(false)
+  const [confirmEx,    setConfirmEx]    = useState(null) // exercise pending delete
+
   const allExercises = prog.exercises
   const doneCnt = allExercises.filter(e => todayLogs[e.id]?.done).length
 
-  const handleDeleteExercise = async (ex) => {
-    await supabase.from('exercises').delete().eq('id', ex.id)
-    setActiveEx(null)
+  const handleDeleteExercise = async () => {
+    if (!confirmEx) return
+    await supabase.from('exercises').delete().eq('id', confirmEx.id)
+    setConfirmEx(null)
     onRefresh()
   }
 
@@ -678,34 +794,21 @@ function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, 
         <p style={{ fontSize: '15px', color: GRAY, marginTop: '8px' }}>{prog.name} · <span style={{ color: doneCnt === allExercises.length ? '#10B981' : GRAY }}>In progress</span></p>
       </div>
 
-      {/* Exercise list — swipe to delete */}
+      {/* Exercise list */}
       <div style={{ padding: '0 20px calc(80px + env(safe-area-inset-bottom))', flex: 1 }}>
         {allExercises.map((ex, idx) => {
           const log = todayLogs[ex.id] || {}
           const isDone = !!log.done
+          const exWithLog = { ...ex, _log: log }
           return (
             <div key={ex.id}>
-              <SwipeableRow
-                bgColor={BG}
-                onDelete={() => handleDeleteExercise(ex)}
-              >
-                <div onClick={() => setActiveEx(ex)} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 0', cursor: 'pointer' }}>
-                  <div onClick={e => { e.stopPropagation(); onToggleDone(ex) }}
-                    style={{ width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0, background: isDone ? WHITE : 'transparent', border: `2px solid ${isDone ? WHITE : '#333'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-                    {isDone && <CheckIcon size={18} color="#111"/>}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: '17px', fontWeight: '600', color: isDone ? GRAY : WHITE, textDecoration: isDone ? 'line-through' : 'none' }}>{ex.name}</p>
-                    <p style={{ fontSize: '13px', color: GRAY2, marginTop: '3px' }}>
-                      {isDone
-                        ? <span style={{ color: GRAY }}>All sets completed{log.weight_used ? ` · ${log.weight_used} lbs` : ''}</span>
-                        : `${ex.sets} sets · ${ex.reps} reps`
-                      }
-                    </p>
-                  </div>
-                  <ChevronRight color={GRAY2}/>
-                </div>
-              </SwipeableRow>
+              <SwipeableExerciseRow
+                ex={exWithLog}
+                isDone={isDone}
+                onTap={() => setActiveEx(ex)}
+                onToggleDone={() => onToggleDone(ex)}
+                onDeleteIntent={() => setConfirmEx(ex)}
+              />
               {idx < allExercises.length - 1 && (
                 <div style={{ marginLeft: '22px', width: '2px', height: '16px', background: '#222', borderRadius: '1px' }}/>
               )}
@@ -731,7 +834,10 @@ function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, 
           onBack={() => setActiveEx(null)}
           onLogSet={(exId, w, r, n) => onLogSet(exId, w, r, n)}
           onStartRest={onStartRest}
-          onDelete={() => handleDeleteExercise(activeEx)}
+          onDelete={() => {
+            setActiveEx(null)
+            setConfirmEx(activeEx)
+          }}
         />
       )}
 
@@ -742,6 +848,16 @@ function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, 
           programId={prog.id}
           onAdded={onRefresh}
           onClose={() => setShowLibrary(false)}
+        />
+      )}
+
+      {/* Confirm delete exercise */}
+      {confirmEx && (
+        <ConfirmDeleteModal
+          title={`Delete "${confirmEx.name}"?`}
+          subtitle="This will remove the exercise from your program. All logged data will be lost."
+          onConfirm={handleDeleteExercise}
+          onCancel={() => setConfirmEx(null)}
         />
       )}
     </div>
@@ -817,9 +933,7 @@ function Sheet({ title, onClose, children }) {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', paddingTop: '8px' }}>
           <p style={{ fontSize: '20px', fontWeight: '700', color: WHITE }}>{title}</p>
-          <button onClick={onClose} style={{ background: CARD2, border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <CloseIcon />
-          </button>
+          <button onClick={onClose} style={{ background: CARD2, border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><CloseIcon /></button>
         </div>
         {children}
       </div>
@@ -891,17 +1005,17 @@ const labelStyle = { fontSize: '12px', color: GRAY, display: 'block', marginBott
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function Workout({ workoutActive, workoutElapsed, workoutRunning, onStartWorkout, onStopWorkout, onToggleTimer, recoveryScore }) {
-  const [programs, setPrograms] = useState([])
-  const [todayLogs, setTodayLogs] = useState({})
+  const [programs, setPrograms]       = useState([])
+  const [todayLogs, setTodayLogs]     = useState({})
   const [lastWeekLogs, setLastWeekLogs] = useState({})
-  const [selected, setSelected] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [restTimer, setRestTimer] = useState(null)
+  const [selected, setSelected]       = useState(null)
+  const [loading, setLoading]         = useState(true)
+  const [restTimer, setRestTimer]     = useState(null)
   const [activeSheet, setActiveSheet] = useState(null)
-  const [activeView, setActiveView] = useState('training')
+  const [activeView, setActiveView]   = useState('training')
   const [showWorkout, setShowWorkout] = useState(false)
   const [editingProg, setEditingProg] = useState(null)
-  const [progForm, setProgForm] = useState({ name: '', tag: 'Strength' })
+  const [progForm, setProgForm]       = useState({ name: '', tag: 'Strength' })
 
   useEffect(() => { loadAll() }, [])
 
@@ -964,16 +1078,9 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
 
   const handleSelectProgram = (p) => setSelected(prev => prev === p.id ? null : p.id)
 
-  const handleStartWorkout = () => {
-    onStartWorkout()
-    setShowWorkout(true)
-  }
+  const handleStartWorkout = () => { onStartWorkout(); setShowWorkout(true) }
 
-  const handleFinishWorkout = () => {
-    onStopWorkout()
-    setSelected(null)
-    setShowWorkout(false)
-  }
+  const handleFinishWorkout = () => { onStopWorkout(); setSelected(null); setShowWorkout(false) }
 
   const saveProg = async () => {
     if (!progForm.name.trim()) return
@@ -992,7 +1099,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', flexDirection: 'column', gap: '16px' }}>
       <div style={{ width: '36px', height: '36px', borderRadius: '50%', border: `3px solid ${CARD2}`, borderTop: `3px solid ${WHITE}`, animation: 'spin 1s linear infinite' }}/>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 
