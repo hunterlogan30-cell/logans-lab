@@ -1148,7 +1148,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
           onLogSet={handleLogSet} onToggleDone={handleToggleDone} onStartRest={startRest} onRefresh={loadAll}/>
       )}
 
-      {restTimer && <RestTimer key={restTimer.key} restSeconds={restTimer.secs} onDismiss={() => setRestTimer(null)} />}
+     {restTimer && <RestTimer key={restTimer.key} restSeconds={restTimer.secs} onDismiss={() => setRestTimer(null)} />}
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
@@ -1162,9 +1162,9 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
             </div>
           )}
         </div>
-        <button onClick={() => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setActiveSheet('prog') }}
-          style={{ width: '40px', height: '40px', borderRadius: '12px', background: CARD, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <PlusIcon size={18} />
+        <button onClick={() => setShowCoach(true)}
+          style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CARD, boxShadow: '0 0 16px rgba(99,102,241,0.5), 0 0 32px rgba(59,130,246,0.25)' }}>
+          <MustacheIcon size={26} />
         </button>
       </div>
 
@@ -1217,7 +1217,12 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
 
           <div style={{ marginBottom: '28px' }}>
             <p style={{ fontSize: '22px', fontWeight: '700', color: WHITE, marginBottom: '16px' }}>This Week</p>
-            <WeekStrip programs={programs} selectedDayOfWeek={selectedDayOfWeek} onSelect={handleSelectProgram} />
+            <WeekStrip
+              programs={programs}
+              selectedDayOfWeek={selectedDayOfWeek}
+              onSelect={handleSelectProgram}
+              onAddProgram={() => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setActiveSheet('prog') }}
+            />
           </div>
 
           {programs.length > 0 && (
@@ -1227,6 +1232,17 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
             </div>
           )}
         </>
+      )}
+
+      {showCoach && (
+        <Sheet title="AI Coach" onClose={() => setShowCoach(false)}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0 8px', gap: '12px' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #3B82F6, #6366F1)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 24px rgba(99,102,241,0.5)' }}>
+              <MustacheIcon size={28} />
+            </div>
+            <p style={{ fontSize: '16px', color: GRAY, textAlign: 'center', lineHeight: 1.6 }}>Your AI coach is coming soon. Drop in your Gemini key and I'll start giving you recommendations based on your training data.</p>
+          </div>
+        </Sheet>
       )}
 
       {activeSheet === 'prog' && (
