@@ -38,7 +38,18 @@ const getRecommendedRest = (base, recovery) => {
   return Math.round(base * 1.3)
 }
 
-const TODAY = new Date().toISOString().split('T')[0]
+const localDateStr = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+const TODAY = localDateStr()
+
+const calc1RM = (weight, reps) => {
+  const w = parseFloat(weight) || 0
+  const r = parseFloat(String(reps || '').split('-')[0]) || 1
+  if (!w || r <= 0) return 0
+  return Math.round(w * (1 + r / 30))
+}
 
 const STANDARD_EXERCISES = [
   'Bench Press','Incline Bench Press','Decline Bench Press','Dumbbell Fly','Cable Fly',
@@ -87,6 +98,80 @@ const SearchIcon = () => (
 const TrashIcon = ({ color = '#EF4444', size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
 )
+const GearIcon = ({ color = GRAY, size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+  </svg>
+)
+const FireIcon = ({ color = '#FF6B35', size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 3z"/>
+  </svg>
+)
+
+// ─── Analytics Chart ──────────────────────────────────────────────────────────
+function AnalyticsChart({ logs }) {
+  const containerRef = useRef(null)
+  const canvasRef    = useRef(null)
+  const validLogs    = logs.filter(l => l.weight_used && !isNaN(parseFloat(l.weight_used)))
+
+  useEffect(() => {
+    const draw = () => {
+      const canvas = canvasRef.current
+      const container = containerRef.current
+      if (!canvas || !container || validLogs.length < 2) return
+      const dpr = window.devicePixelRatio || 1
+      const W = container.offsetWidth
+      const H = 88
+      canvas.width = W * dpr; canvas.height = H * dpr
+      canvas.style.width = W + 'px'; canvas.style.height = H + 'px'
+      const ctx = canvas.getContext('2d')
+      ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H)
+      const weights = validLogs.map(l => parseFloat(l.weight_used))
+      const minW = Math.min(...weights) * 0.92
+      const maxW = Math.max(...weights) * 1.05
+      const range = maxW - minW || 1
+      const pad = { top: 10, bottom: 10, left: 2, right: 2 }
+      const cW = W - pad.left - pad.right
+      const cH = H - pad.top - pad.bottom
+      const toX = i => pad.left + (validLogs.length > 1 ? (i / (validLogs.length - 1)) * cW : cW / 2)
+      const toY = w => pad.top + cH - ((w - minW) / range) * cH
+      // Area fill
+      ctx.beginPath()
+      ctx.moveTo(toX(0), toY(weights[0]))
+      weights.slice(1).forEach((w, i) => ctx.lineTo(toX(i + 1), toY(w)))
+      ctx.lineTo(toX(validLogs.length - 1), H)
+      ctx.lineTo(toX(0), H)
+      ctx.closePath()
+      const grad = ctx.createLinearGradient(0, 0, 0, H)
+      grad.addColorStop(0, 'rgba(255,255,255,0.1)')
+      grad.addColorStop(1, 'rgba(255,255,255,0)')
+      ctx.fillStyle = grad; ctx.fill()
+      // Line
+      ctx.beginPath()
+      ctx.moveTo(toX(0), toY(weights[0]))
+      weights.slice(1).forEach((w, i) => ctx.lineTo(toX(i + 1), toY(w)))
+      ctx.strokeStyle = WHITE; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke()
+      // Last dot
+      const last = validLogs.length - 1
+      ctx.beginPath(); ctx.arc(toX(last), toY(weights[last]), 4, 0, Math.PI * 2)
+      ctx.fillStyle = WHITE; ctx.fill()
+    }
+    draw()
+    const ro = new ResizeObserver(draw)
+    if (containerRef.current) ro.observe(containerRef.current)
+    return () => ro.disconnect()
+  }, [validLogs.length])
+
+  if (validLogs.length < 2) return (
+    <p style={{ fontSize: '13px', color: GRAY2, textAlign: 'center', padding: '8px 0' }}>Log 2+ sessions to see progression</p>
+  )
+  return (
+    <div ref={containerRef} style={{ width: '100%' }}>
+      <canvas ref={canvasRef} style={{ display: 'block' }}/>
+    </div>
+  )
+}
 
 // ─── Confirm Delete Modal ─────────────────────────────────────────────────────
 function ConfirmDeleteModal({ title, subtitle, onConfirm, onCancel }) {
@@ -101,32 +186,26 @@ function ConfirmDeleteModal({ title, subtitle, onConfirm, onCancel }) {
         </div>
         <p style={{ fontSize: '20px', fontWeight: '700', color: WHITE, textAlign: 'center', marginBottom: '8px' }}>{title}</p>
         <p style={{ fontSize: '14px', color: GRAY, textAlign: 'center', marginBottom: '32px', lineHeight: 1.6 }}>{subtitle}</p>
-        <button onClick={onConfirm}
-          style={{ width: '100%', padding: '16px', borderRadius: '14px', background: '#EF4444', border: 'none', color: WHITE, fontSize: '16px', fontWeight: '700', fontFamily: 'Inter, sans-serif', cursor: 'pointer', marginBottom: '10px' }}>
-          Delete
-        </button>
-        <button onClick={onCancel} style={{ ...GHOST_BTN, width: '100%', padding: '14px', fontSize: '15px', textAlign: 'center' }}>
-          Cancel
-        </button>
+        <button onClick={onConfirm} style={{ width: '100%', padding: '16px', borderRadius: '14px', background: '#EF4444', border: 'none', color: WHITE, fontSize: '16px', fontWeight: '700', fontFamily: 'Inter, sans-serif', cursor: 'pointer', marginBottom: '10px' }}>Delete</button>
+        <button onClick={onCancel} style={{ ...GHOST_BTN, width: '100%', padding: '14px', fontSize: '15px', textAlign: 'center' }}>Cancel</button>
       </div>
     </>
   )
 }
 
 // ─── Swipeable Exercise Row ───────────────────────────────────────────────────
-// Circle morphs to trash on swipe. Release past threshold → confirm dialog.
 function SwipeableExerciseRow({ ex, isDone, onTap, onToggleDone, onDeleteIntent }) {
   const [offsetX, setOffsetX]   = useState(0)
   const [dragging, setDragging] = useState(false)
   const startX      = useRef(0)
   const startY      = useRef(0)
   const liveOffset  = useRef(0)
-  const maxSwipe    = useRef(0) // used to suppress click after swipe
+  const maxSwipe    = useRef(0)
   const isScrolling = useRef(null)
   const vibratedAt  = useRef(0)
 
-  const MORPH_START = 18   // circle starts transforming
-  const COMMIT      = 110  // release here triggers delete intent
+  const MORPH_START = 18
+  const COMMIT      = 110
 
   const morphPct   = Math.min(Math.max((offsetX - MORPH_START) / (COMMIT - MORPH_START), 0), 1)
   const showTrash  = offsetX >= MORPH_START
@@ -135,63 +214,32 @@ function SwipeableExerciseRow({ ex, isDone, onTap, onToggleDone, onDeleteIntent 
   const onTouchStart = (e) => {
     startX.current = e.touches[0].clientX
     startY.current = e.touches[0].clientY
-    isScrolling.current = null
-    maxSwipe.current = 0
-    setDragging(true)
+    isScrolling.current = null; maxSwipe.current = 0; setDragging(true)
   }
-
   const onTouchMove = (e) => {
     const dx = e.touches[0].clientX - startX.current
     const dy = Math.abs(e.touches[0].clientY - startY.current)
-
     if (isScrolling.current === null) {
       if (Math.abs(dx) < 5 && dy < 5) return
       isScrolling.current = dy > Math.abs(dx)
     }
     if (isScrolling.current) return
-
     maxSwipe.current = Math.max(maxSwipe.current, Math.abs(dx))
-
     if (dx <= 0) { liveOffset.current = 0; setOffsetX(0); return }
-
-    // Rubber-band past commit
     const clamped = dx < COMMIT ? dx : COMMIT + (dx - COMMIT) * 0.18
-    liveOffset.current = clamped
-    setOffsetX(clamped)
-
-    // Vibrate once when crossing commit threshold
+    liveOffset.current = clamped; setOffsetX(clamped)
     if (dx >= COMMIT) {
       const now = Date.now()
-      if (now - vibratedAt.current > 400) {
-        vibrate([20])
-        vibratedAt.current = now
-      }
+      if (now - vibratedAt.current > 400) { vibrate([20]); vibratedAt.current = now }
     }
   }
-
   const onTouchEnd = () => {
     setDragging(false)
     const didCommit = liveOffset.current >= COMMIT
-    setOffsetX(0)
-    liveOffset.current = 0
-    if (didCommit) {
-      vibrate([50, 30, 80])
-      onDeleteIntent()
-    }
+    setOffsetX(0); liveOffset.current = 0
+    if (didCommit) { vibrate([50, 30, 80]); onDeleteIntent() }
   }
 
-  const handleRowClick = () => {
-    if (maxSwipe.current > 10) return // suppress click after any meaningful swipe
-    onTap()
-  }
-
-  const handleCircleClick = (e) => {
-    e.stopPropagation()
-    if (maxSwipe.current > 10) return
-    onToggleDone()
-  }
-
-  // Circle colors
   const circleBg     = showTrash ? `rgba(239,68,68,${0.08 + morphPct * 0.12})` : (isDone ? WHITE : 'transparent')
   const circleBorder = showTrash ? `2px solid rgba(239,68,68,${0.4 + morphPct * 0.6})` : `2px solid ${isDone ? WHITE : '#333'}`
 
@@ -199,50 +247,27 @@ function SwipeableExerciseRow({ ex, isDone, onTap, onToggleDone, onDeleteIntent 
     <>
       <style>{`@keyframes trashShake{0%,100%{transform:rotate(0deg)}25%{transform:rotate(-15deg)}75%{transform:rotate(15deg)}}`}</style>
       <div
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onClick={handleRowClick}
-      style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 0', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none' }}
-    >
-      {/* Circle → Trash */}
-      <div
-        onClick={handleCircleClick}
-        style={{
-          width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0,
-          background: circleBg,
-          border: circleBorder,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: dragging ? 'none' : 'all 0.25s',
-          animation: pastCommit ? 'trashShake 0.25s ease infinite' : 'none',
-        }}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        onClick={() => { if (maxSwipe.current > 10) return; onTap() }}
+        style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 0', cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none' }}
       >
-        {showTrash
-          ? <TrashIcon size={18} color={`rgba(239,68,68,${0.5 + morphPct * 0.5})`}/>
-          : isDone
-            ? <CheckIcon size={18} color="#111"/>
-            : null
-        }
+        <div onClick={e => { e.stopPropagation(); if (maxSwipe.current > 10) return; onToggleDone() }}
+          style={{ width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0, background: circleBg, border: circleBorder, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: dragging ? 'none' : 'all 0.25s', animation: pastCommit ? 'trashShake 0.25s ease infinite' : 'none' }}>
+          {showTrash ? <TrashIcon size={18} color={`rgba(239,68,68,${0.5 + morphPct * 0.5})`}/> : isDone ? <CheckIcon size={18} color="#111"/> : null}
+        </div>
+        <div style={{ flex: 1, pointerEvents: 'none' }}>
+          <p style={{ fontSize: '17px', fontWeight: '600', color: isDone ? GRAY : WHITE, textDecoration: isDone ? 'line-through' : 'none' }}>{ex.name}</p>
+          <p style={{ fontSize: '13px', color: GRAY2, marginTop: '3px' }}>
+            {isDone ? <span style={{ color: GRAY }}>Completed{ex._log?.weight_used ? ` · ${ex._log.weight_used} lbs` : ''}</span> : `${ex.sets} sets · ${ex.reps} reps`}
+          </p>
+        </div>
+        <ChevronRight color={GRAY2}/>
       </div>
-
-      {/* Text */}
-      <div style={{ flex: 1, pointerEvents: 'none' }}>
-        <p style={{ fontSize: '17px', fontWeight: '600', color: isDone ? GRAY : WHITE, textDecoration: isDone ? 'line-through' : 'none' }}>{ex.name}</p>
-        <p style={{ fontSize: '13px', color: GRAY2, marginTop: '3px' }}>
-          {isDone
-            ? <span style={{ color: GRAY }}>Completed{ex._log?.weight_used ? ` · ${ex._log.weight_used} lbs` : ''}</span>
-            : `${ex.sets} sets · ${ex.reps} reps`
-          }
-        </p>
-      </div>
-
-      <ChevronRight color={GRAY2}/>
-    </div>
     </>
   )
 }
+
 // ─── Swipeable Set Row ────────────────────────────────────────────────────────
-// Same pattern: swipe left → circle morphs to trash → release → confirm.
 function SwipeableSetRow({ setData, idx, onToggleDone, onOpenPicker, onDeleteIntent }) {
   const [offsetX, setOffsetX]   = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -263,93 +288,47 @@ function SwipeableSetRow({ setData, idx, onToggleDone, onOpenPicker, onDeleteInt
   const onTouchStart = (e) => {
     startX.current = e.touches[0].clientX
     startY.current = e.touches[0].clientY
-    isScrolling.current = null
-    maxSwipe.current = 0
-    setDragging(true)
+    isScrolling.current = null; maxSwipe.current = 0; setDragging(true)
   }
-
   const onTouchMove = (e) => {
     const dx = e.touches[0].clientX - startX.current
     const dy = Math.abs(e.touches[0].clientY - startY.current)
-
     if (isScrolling.current === null) {
       if (Math.abs(dx) < 5 && dy < 5) return
       isScrolling.current = dy > Math.abs(dx)
     }
     if (isScrolling.current) return
-
     maxSwipe.current = Math.max(maxSwipe.current, Math.abs(dx))
-
     if (dx <= 0) { liveOffset.current = 0; setOffsetX(0); return }
-
     const clamped = dx < COMMIT ? dx : COMMIT + (dx - COMMIT) * 0.18
-    liveOffset.current = clamped
-    setOffsetX(clamped)
-
+    liveOffset.current = clamped; setOffsetX(clamped)
     if (dx >= COMMIT) {
       const now = Date.now()
-      if (now - vibratedAt.current > 400) {
-        vibrate([20])
-        vibratedAt.current = now
-      }
+      if (now - vibratedAt.current > 400) { vibrate([20]); vibratedAt.current = now }
     }
   }
-
   const onTouchEnd = () => {
     setDragging(false)
     const didCommit = liveOffset.current >= COMMIT
-    setOffsetX(0)
-    liveOffset.current = 0
-    if (didCommit) {
-      vibrate([50, 30, 80])
-      onDeleteIntent(idx)
-    }
-  }
-
-  const handleCircleClick = () => {
-    if (maxSwipe.current > 10) return
-    onToggleDone(idx)
+    setOffsetX(0); liveOffset.current = 0
+    if (didCommit) { vibrate([50, 30, 80]); onDeleteIntent(idx) }
   }
 
   const circleBg     = showTrash ? `rgba(239,68,68,${0.08 + morphPct * 0.12})` : (setData.done ? WHITE : CARD2)
   const circleBorder = showTrash ? `2px solid rgba(239,68,68,${0.4 + morphPct * 0.6})` : (setData.done ? `2px solid ${WHITE}` : 'none')
 
   return (
-    <div
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px', userSelect: 'none', WebkitUserSelect: 'none' }}
-    >
-      {/* Circle → Trash */}
-      <div
-        onClick={handleCircleClick}
-        style={{
-          width: '44px', height: '44px', borderRadius: '12px', flexShrink: 0,
-          background: circleBg,
-          border: circleBorder,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer',
-          transition: dragging ? 'none' : 'all 0.25s',
-          animation: pastCommit ? 'trashShake 0.25s ease infinite' : 'none',
-        }}
-      >
-        {showTrash
-          ? <TrashIcon size={18} color={`rgba(239,68,68,${0.5 + morphPct * 0.5})`}/>
-          : setData.done
-            ? <CheckIcon size={20} color="#111"/>
-            : null
-        }
+    <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+      style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px', userSelect: 'none', WebkitUserSelect: 'none' }}>
+      <div onClick={() => { if (maxSwipe.current > 10) return; onToggleDone(idx) }}
+        style={{ width: '44px', height: '44px', borderRadius: '12px', flexShrink: 0, background: circleBg, border: circleBorder, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: dragging ? 'none' : 'all 0.25s', animation: pastCommit ? 'trashShake 0.25s ease infinite' : 'none' }}>
+        {showTrash ? <TrashIcon size={18} color={`rgba(239,68,68,${0.5 + morphPct * 0.5})`}/> : setData.done ? <CheckIcon size={20} color="#111"/> : null}
       </div>
-
-      <div
-        onClick={() => { if (maxSwipe.current <= 10) onOpenPicker(idx, 'weight') }}
+      <div onClick={() => { if (maxSwipe.current <= 10) onOpenPicker(idx, 'weight') }}
         style={{ background: CARD2, borderRadius: '100px', padding: '10px 18px', cursor: 'pointer', textAlign: 'center' }}>
         <span style={{ fontSize: '15px', fontWeight: '600', color: WHITE }}>{setData.weight || '—'} lbs</span>
       </div>
-
-      <div
-        onClick={() => { if (maxSwipe.current <= 10) onOpenPicker(idx, 'reps') }}
+      <div onClick={() => { if (maxSwipe.current <= 10) onOpenPicker(idx, 'reps') }}
         style={{ background: CARD2, borderRadius: '100px', padding: '10px 18px', cursor: 'pointer', textAlign: 'center' }}>
         <span style={{ fontSize: '15px', fontWeight: '600', color: WHITE }}>{setData.reps || '—'} reps</span>
       </div>
@@ -394,38 +373,37 @@ function ProgressBorderCard({ pct, children }) {
 }
 
 // ─── Week Strip ───────────────────────────────────────────────────────────────
-function WeekStrip({ programs, selectedId, onSelect }) {
-  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-  const todayIdx = new Date().getDay()
-  const scrollRef = useRef(null)
+// Today is always first. selectedDayOfWeek is the absolute day-of-week (0=Sun) that is selected.
+function WeekStrip({ programs, selectedDayOfWeek, onSelect }) {
+  const LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+  const todayDow = new Date().getDay()
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      const el = scrollRef.current.children[todayIdx]
-      if (el) el.scrollIntoView({ inline: 'center', behavior: 'smooth' })
+  // Build 7 entries starting from today
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const dow = (todayDow + i) % 7
+    return {
+      dow,
+      label: i === 0 ? 'Today' : LABELS[dow],
+      prog: programs.length ? programs[i % programs.length] : null,
     }
-  }, [])
+  })
 
   return (
-    <div ref={scrollRef} style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-      {DAYS.map((day, i) => {
-        const prog = programs.length ? programs[i % programs.length] : null
-        const isToday = i === todayIdx
-        const isSelected = prog?.id === selectedId
-        const highlighted = isSelected || (!selectedId && isToday)
-
+    <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+      {days.map(({ dow, label, prog }) => {
+        const isSelected  = dow === selectedDayOfWeek
         return (
-          <div key={day} onClick={() => prog && onSelect(prog)}
-            style={{ minWidth: '148px', borderRadius: '18px', padding: '18px', background: highlighted ? WHITE : CARD, flexShrink: 0, cursor: prog ? 'pointer' : 'default', opacity: !prog ? 0.4 : 1, transition: 'background 0.2s' }}>
-            <p style={{ fontSize: '13px', color: highlighted ? '#777' : GRAY2, marginBottom: '8px', fontWeight: '500' }}>{isToday ? 'Today' : day}</p>
-            <p style={{ fontSize: '20px', fontWeight: '700', color: highlighted ? '#111' : WHITE, marginBottom: '12px', letterSpacing: '-0.3px' }}>{prog?.name || 'Rest'}</p>
+          <div key={dow} onClick={() => prog && onSelect(prog, dow)}
+            style={{ minWidth: '148px', borderRadius: '18px', padding: '18px', background: isSelected ? WHITE : CARD, flexShrink: 0, cursor: prog ? 'pointer' : 'default', opacity: !prog ? 0.4 : 1, transition: 'background 0.2s' }}>
+            <p style={{ fontSize: '13px', color: isSelected ? '#777' : GRAY2, marginBottom: '8px', fontWeight: '500' }}>{label}</p>
+            <p style={{ fontSize: '20px', fontWeight: '700', color: isSelected ? '#111' : WHITE, marginBottom: '12px', letterSpacing: '-0.3px' }}>{prog?.name || 'Rest'}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
-              <DumbbellIcon color={highlighted ? '#777' : GRAY2} size={12}/>
-              <span style={{ fontSize: '12px', color: highlighted ? '#777' : GRAY2 }}>{prog?.exercises?.length || 0} Exercises</span>
+              <DumbbellIcon color={isSelected ? '#777' : GRAY2} size={12}/>
+              <span style={{ fontSize: '12px', color: isSelected ? '#777' : GRAY2 }}>{prog?.exercises?.length || 0} Exercises</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <TimerIcon color={highlighted ? '#777' : GRAY2}/>
-              <span style={{ fontSize: '12px', color: highlighted ? '#777' : GRAY2 }}>~52 min avg.</span>
+              <TimerIcon color={isSelected ? '#777' : GRAY2}/>
+              <span style={{ fontSize: '12px', color: isSelected ? '#777' : GRAY2 }}>~52 min avg.</span>
             </div>
           </div>
         )
@@ -434,56 +412,77 @@ function WeekStrip({ programs, selectedId, onSelect }) {
   )
 }
 
-// ─── Focus Areas ──────────────────────────────────────────────────────────────
-function FocusAreas({ todayLogs, programs }) {
-  const allExIds = programs.flatMap(p => (p.exercises||[]).flatMap(e => [e.id, ...(e.variants||[]).map(v => v.id)]))
-  const doneCnt = allExIds.filter(id => todayLogs[id]?.done).length
-  const total = Math.max(allExIds.length, 1)
+// ─── This Week Section ────────────────────────────────────────────────────────
+function ThisWeekSection({ weeklyWorkoutDays, workoutStreak, todayLogs }) {
   const volume = Object.values(todayLogs).reduce((s,l) => s+(parseFloat(l.weight_used)||0)*(parseFloat(l.reps_done)||0), 0)
+  const LABELS = ['S','M','T','W','T','F','S']
+  const todayDow = new Date().getDay()
+
+  const getDowDate = (dow) => {
+    const d = new Date()
+    d.setDate(d.getDate() - todayDow + dow)
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {/* Volume + streak */}
       <div style={{ background: CARD, borderRadius: '16px', padding: '18px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <p style={{ fontSize: '12px', color: GRAY, marginBottom: '6px' }}>Volume · Today</p>
           <p style={{ fontSize: '28px', fontWeight: '700', color: WHITE }}>{volume > 0 ? volume.toLocaleString() : '—'}</p>
           <p style={{ fontSize: '12px', color: GRAY, marginTop: '2px' }}>lbs</p>
         </div>
-        <svg width="80" height="36" viewBox="0 0 80 36" fill="none">
-          <polyline points="0,28 20,20 40,24 60,10 80,16" stroke={GRAY2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+        {workoutStreak > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,107,53,0.12)', borderRadius: '100px', padding: '8px 14px' }}>
+            <FireIcon size={14} color="#FF6B35"/>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: '#FF6B35' }}>{workoutStreak} week{workoutStreak !== 1 ? 's' : ''}</span>
+          </div>
+        )}
       </div>
-      <div style={{ background: CARD, borderRadius: '16px', padding: '18px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <p style={{ fontSize: '12px', color: GRAY, marginBottom: '6px' }}>Exercises · Today</p>
-          <p style={{ fontSize: '28px', fontWeight: '700', color: WHITE }}>{doneCnt}</p>
-          <p style={{ fontSize: '12px', color: GRAY, marginTop: '2px' }}>of {total}</p>
+
+      {/* Workouts this week */}
+      <div style={{ background: CARD, borderRadius: '16px', padding: '18px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
+          <div>
+            <p style={{ fontSize: '12px', color: GRAY, marginBottom: '6px' }}>Workouts · This Week</p>
+            <p style={{ fontSize: '28px', fontWeight: '700', color: WHITE }}>{weeklyWorkoutDays.size}</p>
+            <p style={{ fontSize: '12px', color: GRAY, marginTop: '2px' }}>of 7 days</p>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', maxWidth: '120px', justifyContent: 'flex-end', paddingTop: '8px' }}>
-          {Array.from({ length: Math.min(total,10) }, (_,i) => (
-            <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i < doneCnt ? WHITE : GRAY2 }}/>
-          ))}
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {LABELS.map((label, dow) => {
+            const dateStr  = getDowDate(dow)
+            const isToday  = dow === todayDow
+            const isFuture = dow > todayDow
+            const hasWork  = weeklyWorkoutDays.has(dateStr)
+            return (
+              <div key={dow} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: hasWork ? WHITE : (isFuture ? '#1a1a1a' : CARD2), border: isToday && !hasWork ? `2px solid ${GRAY2}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {hasWork && <CheckIcon size={13} color="#111"/>}
+                </div>
+                <p style={{ fontSize: '10px', color: isToday ? WHITE : GRAY2, fontWeight: isToday ? '700' : '400' }}>{label}</p>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>
   )
 }
 
-// ─── Number Picker Sheet ──────────────────────────────────────────────────────
+// ─── Number Picker ────────────────────────────────────────────────────────────
 function NumberPicker({ label, value, isReps, onSave, onClose }) {
   const isRange = isReps && String(value).includes('-')
   const [rangeMode, setRangeMode] = useState(isRange)
-  const [single, setSingle] = useState(isRange ? String(value).split('-')[0] : String(value || ''))
-  const [rangeLow, setRangeLow] = useState(isRange ? String(value).split('-')[0] : String(value || ''))
+  const [single, setSingle]       = useState(isRange ? String(value).split('-')[0] : String(value || ''))
+  const [rangeLow, setRangeLow]   = useState(isRange ? String(value).split('-')[0] : String(value || ''))
   const [rangeHigh, setRangeHigh] = useState(isRange ? String(value).split('-')[1] : String(parseFloat(value||0)+2))
 
   const step = isReps ? 1 : 2.5
   const increment = (setter, val) => setter(String(Math.max(0, parseFloat(val||0) + step)))
   const decrement = (setter, val) => setter(String(Math.max(0, parseFloat(val||0) - step)))
-
-  const handleSave = () => {
-    onSave(rangeMode ? `${rangeLow}-${rangeHigh}` : single)
-    onClose()
-  }
+  const handleSave = () => { onSave(rangeMode ? `${rangeLow}-${rangeHigh}` : single); onClose() }
 
   return (
     <>
@@ -495,8 +494,7 @@ function NumberPicker({ label, value, isReps, onSave, onClose }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
           <p style={{ fontSize: '16px', fontWeight: '600', color: WHITE }}>{label}</p>
           {isReps && (
-            <button onClick={() => setRangeMode(r => !r)}
-              style={{ background: rangeMode ? WHITE : CARD2, border: 'none', borderRadius: '100px', padding: '8px 16px', color: rangeMode ? '#111' : GRAY, fontSize: '13px', fontWeight: '600', fontFamily: 'Inter, sans-serif', cursor: 'pointer' }}>
+            <button onClick={() => setRangeMode(r => !r)} style={{ background: rangeMode ? WHITE : CARD2, border: 'none', borderRadius: '100px', padding: '8px 16px', color: rangeMode ? '#111' : GRAY, fontSize: '13px', fontWeight: '600', fontFamily: 'Inter, sans-serif', cursor: 'pointer' }}>
               Range {rangeMode ? 'on' : 'off'}
             </button>
           )}
@@ -504,8 +502,7 @@ function NumberPicker({ label, value, isReps, onSave, onClose }) {
         {!rangeMode ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
             <button onClick={() => decrement(setSingle, single)} style={{ width: '56px', height: '56px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>−</button>
-            <input type="number" value={single} onChange={e => setSingle(e.target.value)} autoFocus
-              style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '72px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', textAlign: 'center', width: '200px', letterSpacing: '-2px' }}/>
+            <input type="number" value={single} onChange={e => setSingle(e.target.value)} autoFocus style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '72px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', textAlign: 'center', width: '200px', letterSpacing: '-2px' }}/>
             <button onClick={() => increment(setSingle, single)} style={{ width: '56px', height: '56px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>+</button>
           </div>
         ) : (
@@ -514,15 +511,13 @@ function NumberPicker({ label, value, isReps, onSave, onClose }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <button onClick={() => decrement(setRangeLow, rangeLow)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-                <input type="number" value={rangeLow} onChange={e => setRangeLow(e.target.value)}
-                  style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '56px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', textAlign: 'center', width: '100px' }}/>
+                <input type="number" value={rangeLow} onChange={e => setRangeLow(e.target.value)} style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '56px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', textAlign: 'center', width: '100px' }}/>
                 <button onClick={() => increment(setRangeLow, rangeLow)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
               </div>
               <span style={{ fontSize: '32px', color: GRAY, fontWeight: '300' }}>—</span>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <button onClick={() => decrement(setRangeHigh, rangeHigh)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-                <input type="number" value={rangeHigh} onChange={e => setRangeHigh(e.target.value)}
-                  style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '56px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', textAlign: 'center', width: '100px' }}/>
+                <input type="number" value={rangeHigh} onChange={e => setRangeHigh(e.target.value)} style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '56px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', textAlign: 'center', width: '100px' }}/>
                 <button onClick={() => increment(setRangeHigh, rangeHigh)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
               </div>
             </div>
@@ -536,47 +531,61 @@ function NumberPicker({ label, value, isReps, onSave, onClose }) {
 
 // ─── Exercise Detail Screen ───────────────────────────────────────────────────
 function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest, onDelete }) {
-  const [sets, setSets] = useState(() => {
-    if (log?.weight_used && log?.reps_done) {
-      return [{ weight: String(log.weight_used), reps: String(log.reps_done), done: !!log.done }]
-    }
+  const [sets, setSets]               = useState(() => {
+    if (log?.weight_used && log?.reps_done) return [{ weight: String(log.weight_used), reps: String(log.reps_done), done: !!log.done }]
     return [{ weight: String(lastLog?.weight_used || ex.weight || ''), reps: String(ex.reps || ''), done: false }]
   })
-  const [notes, setNotes]           = useState(log?.notes || '')
-  const [picker, setPicker]         = useState(null)
-  const [confirmSet, setConfirmSet] = useState(null) // idx of set pending delete
+  const [notes, setNotes]             = useState(log?.notes || '')
+  const [picker, setPicker]           = useState(null)
+  const [confirmSet, setConfirmSet]   = useState(null)
+  const [historicalLogs, setHistoricalLogs] = useState([])
+  const [showRestSheet, setShowRestSheet]   = useState(false)
+  const [restSecs, setRestSecs]       = useState(ex.rest_seconds || 90)
+  const [savingRest, setSavingRest]   = useState(false)
 
-  const openPicker = (setIdx, field) => setPicker({ setIdx, field })
+  useEffect(() => {
+    const fetch = async () => {
+      const { data } = await supabase
+        .from('workout_logs').select('*')
+        .eq('exercise_id', ex.id)
+        .not('weight_used', 'is', null)
+        .order('logged_date', { ascending: true })
+        .limit(30)
+      setHistoricalLogs(data || [])
+    }
+    fetch()
+  }, [ex.id])
 
-  const savePicker = (val) => {
+  const saveRestTime = async () => {
+    setSavingRest(true)
+    await supabase.from('exercises').update({ rest_seconds: restSecs }).eq('id', ex.id)
+    setSavingRest(false); setShowRestSheet(false)
+  }
+
+  const openPicker    = (setIdx, field) => setPicker({ setIdx, field })
+  const savePicker    = (val) => {
     if (!picker) return
     setSets(prev => prev.map((s,i) => i === picker.setIdx ? { ...s, [picker.field]: val } : s))
     setPicker(null)
   }
-
   const toggleSetDone = (idx) => {
     const updated = sets.map((s,i) => i === idx ? { ...s, done: !s.done } : s)
     setSets(updated)
     const s = updated[idx]
-    if (updated[idx].done && s.weight && s.reps) {
-      onLogSet(ex.id, s.weight, s.reps, notes)
-      onStartRest(ex.rest_seconds || 90)
-    }
+    if (updated[idx].done && s.weight && s.reps) { onLogSet(ex.id, s.weight, s.reps, notes); onStartRest(ex.rest_seconds || 90) }
   }
-
-  const confirmDeleteSet = (idx) => setConfirmSet(idx)
-
-  const deleteSet = () => {
-    setSets(prev => prev.filter((_,i) => i !== confirmSet))
-    setConfirmSet(null)
-  }
-
-  const addSet = () => {
-    const last = sets[sets.length - 1]
-    setSets(prev => [...prev, { weight: last?.weight || '', reps: last?.reps || ex.reps || '', done: false }])
-  }
+  const deleteSet = () => { setSets(prev => prev.filter((_,i) => i !== confirmSet)); setConfirmSet(null) }
+  const addSet    = () => { const last = sets[sets.length-1]; setSets(prev => [...prev, { weight: last?.weight || '', reps: last?.reps || ex.reps || '', done: false }]) }
 
   const allDone = sets.length > 0 && sets.every(s => s.done)
+
+  // Analytics
+  const validHistorical = historicalLogs.filter(l => l.weight_used)
+  const best1RM = validHistorical.length > 0 ? Math.max(...validHistorical.map(l => calc1RM(l.weight_used, l.reps_done))) : 0
+  const today1RM = calc1RM(log?.weight_used, log?.reps_done)
+  const isNewPR = today1RM > 0 && today1RM >= best1RM && validHistorical.length > 1
+
+  const REST_PRESETS = [60, 90, 120, 180]
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: BG, overflowY: 'auto', animation: 'slideInRight 0.25s cubic-bezier(0.32,0.72,0,1)' }}>
@@ -584,12 +593,10 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
 
       {/* Top bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '56px 20px 20px' }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
-          <BackIcon />
+        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}><BackIcon /></button>
+        <button onClick={() => setShowRestSheet(true)} style={{ width: '40px', height: '40px', borderRadius: '50%', background: CARD2, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <GearIcon color={GRAY} size={18}/>
         </button>
-        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: CARD2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GRAY} strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        </div>
       </div>
 
       {/* Name */}
@@ -606,54 +613,97 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
         </div>
       )}
 
-      {/* Set rows — swipe to delete */}
+      {/* Sets */}
       <div style={{ padding: '0 20px' }}>
         {sets.map((s, idx) => (
-          <SwipeableSetRow
-            key={idx}
-            setData={s}
-            idx={idx}
-            onToggleDone={toggleSetDone}
-            onOpenPicker={openPicker}
-            onDeleteIntent={confirmDeleteSet}
-          />
+          <SwipeableSetRow key={idx} setData={s} idx={idx} onToggleDone={toggleSetDone} onOpenPicker={openPicker} onDeleteIntent={setConfirmSet}/>
         ))}
-
-        {/* Add set */}
         <div onClick={addSet} style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '28px', cursor: 'pointer' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <PlusIcon size={18} color={GRAY}/>
-          </div>
+          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><PlusIcon size={18} color={GRAY}/></div>
           <span style={{ fontSize: '17px', fontWeight: '500', color: GRAY }}>Add set</span>
         </div>
       </div>
 
-      {/* Divider + notes */}
+      {/* Notes */}
       <div style={{ height: '1px', background: CARD2 }}/>
-      <div style={{ padding: '20px 20px calc(100px + env(safe-area-inset-bottom))' }}>
+      <div style={{ padding: '20px' }}>
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Type anything..."
           rows={4} style={{ width: '100%', background: 'transparent', border: 'none', color: WHITE, fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', resize: 'none', lineHeight: '1.6', boxSizing: 'border-box' }}/>
       </div>
 
+      {/* Analytics */}
+      <div style={{ height: '1px', background: CARD2 }}/>
+      <div style={{ padding: '20px 20px calc(100px + env(safe-area-inset-bottom))' }}>
+        <p style={{ fontSize: '20px', fontWeight: '700', color: WHITE, marginBottom: '14px', letterSpacing: '-0.3px' }}>Analytics</p>
+
+        {/* 1RM card */}
+        <div style={{ background: CARD2, borderRadius: '16px', padding: '16px 18px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <p style={{ fontSize: '12px', color: GRAY, marginBottom: '4px' }}>Est. 1 Rep Max</p>
+            <p style={{ fontSize: '32px', fontWeight: '800', color: WHITE, letterSpacing: '-0.5px' }}>
+              {best1RM > 0 ? best1RM : '—'} <span style={{ fontSize: '14px', color: GRAY, fontWeight: '400' }}>{best1RM > 0 ? 'lbs' : ''}</span>
+            </p>
+          </div>
+          {isNewPR && (
+            <div style={{ background: 'rgba(16,185,129,0.15)', borderRadius: '100px', padding: '8px 14px' }}>
+              <p style={{ fontSize: '13px', fontWeight: '700', color: '#10B981' }}>NEW PR</p>
+            </div>
+          )}
+        </div>
+
+        {/* Weight progression chart */}
+        <div style={{ background: CARD2, borderRadius: '16px', padding: '16px 18px' }}>
+          <p style={{ fontSize: '12px', color: GRAY, marginBottom: '12px' }}>Weight Progression</p>
+          <AnalyticsChart logs={validHistorical}/>
+          {validHistorical.length >= 2 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+              <p style={{ fontSize: '11px', color: GRAY2 }}>{new Date(validHistorical[0].logged_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+              <p style={{ fontSize: '11px', color: GRAY2 }}>Today</p>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Confirm delete set */}
       {confirmSet !== null && (
-        <ConfirmDeleteModal
-          title="Delete this set?"
-          subtitle="All data for this set will be lost."
-          onConfirm={deleteSet}
-          onCancel={() => setConfirmSet(null)}
-        />
+        <ConfirmDeleteModal title="Delete this set?" subtitle="All data for this set will be lost." onConfirm={deleteSet} onCancel={() => setConfirmSet(null)}/>
+      )}
+
+      {/* Rest settings sheet */}
+      {showRestSheet && (
+        <>
+          <div onClick={() => setShowRestSheet(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 600, backdropFilter: 'blur(4px)' }}/>
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 601, background: '#1a1a1a', borderRadius: '24px 24px 0 0', padding: '20px 24px calc(44px + env(safe-area-inset-bottom))' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+              <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: CARD2 }}/>
+            </div>
+            <p style={{ fontSize: '20px', fontWeight: '700', color: WHITE, marginBottom: '4px' }}>Rest Time</p>
+            <p style={{ fontSize: '13px', color: GRAY, marginBottom: '24px' }}>How long to rest between sets for {ex.name}</p>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+              {REST_PRESETS.map(s => (
+                <button key={s} onClick={() => setRestSecs(s)}
+                  style={{ flex: 1, padding: '12px 0', borderRadius: '12px', background: restSecs === s ? WHITE : CARD2, border: 'none', color: restSecs === s ? '#111' : GRAY, fontSize: '13px', fontWeight: restSecs === s ? '700' : '400', fontFamily: 'Inter, sans-serif', cursor: 'pointer' }}>
+                  {s < 60 ? `${s}s` : `${s/60}m`}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '28px', marginBottom: '28px' }}>
+              <button onClick={() => setRestSecs(s => Math.max(15, s - 15))}
+                style={{ width: '52px', height: '52px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+              <p style={{ fontSize: '52px', fontWeight: '800', color: WHITE, letterSpacing: '-1px', minWidth: '110px', textAlign: 'center' }}>{fmtTime(restSecs)}</p>
+              <button onClick={() => setRestSecs(s => s + 15)}
+                style={{ width: '52px', height: '52px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+            </div>
+            <button onClick={saveRestTime} disabled={savingRest} style={{ ...PILL_BTN, width: '100%', opacity: savingRest ? 0.7 : 1 }}>
+              {savingRest ? 'Saving...' : 'Save'} {!savingRest && <ArrowIcon />}
+            </button>
+          </div>
+        </>
       )}
 
       {/* Number picker */}
       {picker && (
-        <NumberPicker
-          label={picker.field === 'weight' ? 'Weight (lbs)' : 'Reps'}
-          value={sets[picker.setIdx][picker.field]}
-          isReps={picker.field === 'reps'}
-          onSave={savePicker}
-          onClose={() => setPicker(null)}
-        />
+        <NumberPicker label={picker.field === 'weight' ? 'Weight (lbs)' : 'Reps'} value={sets[picker.setIdx][picker.field]} isReps={picker.field === 'reps'} onSave={savePicker} onClose={() => setPicker(null)}/>
       )}
     </div>
   )
@@ -661,13 +711,13 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
 
 // ─── Exercise Library ─────────────────────────────────────────────────────────
 function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
-  const [search, setSearch] = useState('')
-  const [adding, setAdding] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newSets, setNewSets] = useState('4')
-  const [newReps, setNewReps] = useState('8-10')
+  const [search, setSearch]     = useState('')
+  const [adding, setAdding]     = useState(false)
+  const [newName, setNewName]   = useState('')
+  const [newSets, setNewSets]   = useState('4')
+  const [newReps, setNewReps]   = useState('8-10')
   const [newWeight, setNewWeight] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving]     = useState(false)
 
   const myNames = myExercises.map(e => e.name.toLowerCase())
   const combined = [
@@ -680,22 +730,18 @@ function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
     if (ex.isMine) { onClose(); return }
     setSaving(true)
     await supabase.from('exercises').insert({ name: ex.name, sets: 4, reps: '8-10', weight: '', rest_seconds: 90, program_id: programId })
-    setSaving(false)
-    onAdded(); onClose()
+    setSaving(false); onAdded(); onClose()
   }
-
   const handleCreateNew = async () => {
     if (!newName.trim()) return
     setSaving(true)
     await supabase.from('exercises').insert({ name: newName, sets: parseInt(newSets)||4, reps: newReps, weight: newWeight, rest_seconds: 90, program_id: programId })
-    setSaving(false)
-    onAdded(); onClose()
+    setSaving(false); onAdded(); onClose()
   }
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: BG, display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s cubic-bezier(0.32,0.72,0,1)' }}>
       <style>{`@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
-
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '56px 20px 16px', flexShrink: 0 }}>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}><BackIcon /></button>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -703,7 +749,6 @@ function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
           <button onClick={onClose} style={{ ...GHOST_BTN, padding: '10px 20px' }}>Done</button>
         </div>
       </div>
-
       <div style={{ padding: '0 20px 16px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: CARD2, borderRadius: '100px', padding: '12px 18px' }}>
           <SearchIcon />
@@ -712,7 +757,6 @@ function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
           {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: GRAY, fontSize: '20px', lineHeight: 1 }}>×</button>}
         </div>
       </div>
-
       {adding && (
         <div style={{ padding: '12px 20px 16px', flexShrink: 0, background: CARD2, marginBottom: '2px' }}>
           <p style={{ fontSize: '12px', color: GRAY, marginBottom: '10px', fontWeight: '500' }}>NEW EXERCISE</p>
@@ -732,12 +776,10 @@ function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
           </button>
         </div>
       )}
-
       <div style={{ padding: '16px 20px 8px', flexShrink: 0 }}>
         <h2 style={{ fontSize: '28px', fontWeight: '800', color: WHITE, letterSpacing: '-0.5px' }}>Library</h2>
         <p style={{ fontSize: '13px', color: GRAY, marginTop: '4px' }}>{filtered.length} exercises{search ? ` matching "${search}"` : ''}</p>
       </div>
-
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
         {filtered.map((ex, i) => (
           <div key={ex.id || ex.name} onClick={() => handleSelectExercise(ex)}
@@ -759,28 +801,22 @@ function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
 
 // ─── Active Workout Screen ────────────────────────────────────────────────────
 function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, onToggle, onBack, onFinish, onLogSet, onToggleDone, onStartRest, onRefresh }) {
-  const [activeEx,     setActiveEx]     = useState(null)
-  const [showLibrary,  setShowLibrary]  = useState(false)
-  const [confirmEx,    setConfirmEx]    = useState(null) // exercise pending delete
-
+  const [activeEx,    setActiveEx]    = useState(null)
+  const [showLibrary, setShowLibrary] = useState(false)
+  const [confirmEx,   setConfirmEx]   = useState(null)
   const allExercises = prog.exercises
   const doneCnt = allExercises.filter(e => todayLogs[e.id]?.done).length
 
   const handleDeleteExercise = async () => {
     if (!confirmEx) return
     await supabase.from('exercises').delete().eq('id', confirmEx.id)
-    setConfirmEx(null)
-    onRefresh()
+    setConfirmEx(null); onRefresh()
   }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: BG, zIndex: 150, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-
-      {/* Top bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '56px 20px 20px', flexShrink: 0 }}>
-        <button onClick={onBack} style={{ background: CARD2, border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-          <BackIcon />
-        </button>
+        <button onClick={onBack} style={{ background: CARD2, border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><BackIcon /></button>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button onClick={onToggle} style={{ background: CARD2, border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             {running
@@ -791,78 +827,39 @@ function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, 
           <button onClick={onFinish} style={{ ...PILL_BTN, padding: '10px 24px', fontSize: '15px' }}>Finish</button>
         </div>
       </div>
-
-      {/* Timer + title */}
       <div style={{ padding: '0 20px 32px', flexShrink: 0 }}>
         <p style={{ fontSize: '56px', fontWeight: '800', color: WHITE, letterSpacing: '-2px', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{fmtTime(elapsed)}</p>
         <p style={{ fontSize: '15px', color: GRAY, marginTop: '8px' }}>{prog.name} · <span style={{ color: doneCnt === allExercises.length ? '#10B981' : GRAY }}>In progress</span></p>
       </div>
-
-      {/* Exercise list */}
       <div style={{ padding: '0 20px calc(80px + env(safe-area-inset-bottom))', flex: 1 }}>
         {allExercises.map((ex, idx) => {
           const log = todayLogs[ex.id] || {}
-          const isDone = !!log.done
-          const exWithLog = { ...ex, _log: log }
           return (
             <div key={ex.id}>
               <SwipeableExerciseRow
-                ex={exWithLog}
-                isDone={isDone}
+                ex={{ ...ex, _log: log }}
+                isDone={!!log.done}
                 onTap={() => setActiveEx(ex)}
                 onToggleDone={() => onToggleDone(ex)}
                 onDeleteIntent={() => setConfirmEx(ex)}
               />
-              {idx < allExercises.length - 1 && (
-                <div style={{ marginLeft: '22px', width: '2px', height: '16px', background: '#222', borderRadius: '1px' }}/>
-              )}
+              {idx < allExercises.length - 1 && <div style={{ marginLeft: '22px', width: '2px', height: '16px', background: '#222', borderRadius: '1px' }}/>}
             </div>
           )
         })}
-
-        {/* Add exercises */}
         <div onClick={() => setShowLibrary(true)} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 0', cursor: 'pointer', opacity: 0.6 }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '50%', border: '2px solid #333', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <PlusIcon size={18} color={GRAY}/>
-          </div>
+          <div style={{ width: '44px', height: '44px', borderRadius: '50%', border: '2px solid #333', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><PlusIcon size={18} color={GRAY}/></div>
           <p style={{ fontSize: '17px', fontWeight: '500', color: GRAY }}>Add exercises</p>
         </div>
       </div>
-
-      {/* Exercise detail */}
       {activeEx && (
-        <ExerciseDetailScreen
-          ex={activeEx}
-          log={todayLogs[activeEx.id]}
-          lastLog={lastWeekLogs[activeEx.id]}
-          onBack={() => setActiveEx(null)}
-          onLogSet={(exId, w, r, n) => onLogSet(exId, w, r, n)}
-          onStartRest={onStartRest}
-          onDelete={() => {
-            setActiveEx(null)
-            setConfirmEx(activeEx)
-          }}
-        />
+        <ExerciseDetailScreen ex={activeEx} log={todayLogs[activeEx.id]} lastLog={lastWeekLogs[activeEx.id]}
+          onBack={() => setActiveEx(null)} onLogSet={(exId, w, r, n) => onLogSet(exId, w, r, n)}
+          onStartRest={onStartRest} onDelete={() => { setActiveEx(null); setConfirmEx(activeEx) }}/>
       )}
-
-      {/* Library */}
-      {showLibrary && (
-        <ExerciseLibrary
-          myExercises={prog.exercises}
-          programId={prog.id}
-          onAdded={onRefresh}
-          onClose={() => setShowLibrary(false)}
-        />
-      )}
-
-      {/* Confirm delete exercise */}
+      {showLibrary && <ExerciseLibrary myExercises={prog.exercises} programId={prog.id} onAdded={onRefresh} onClose={() => setShowLibrary(false)}/>}
       {confirmEx && (
-        <ConfirmDeleteModal
-          title={`Delete "${confirmEx.name}"?`}
-          subtitle="This will remove the exercise from your program. All logged data will be lost."
-          onConfirm={handleDeleteExercise}
-          onCancel={() => setConfirmEx(null)}
-        />
+        <ConfirmDeleteModal title={`Delete "${confirmEx.name}"?`} subtitle="This will remove the exercise from your program. All logged data will be lost." onConfirm={handleDeleteExercise} onCancel={() => setConfirmEx(null)}/>
       )}
     </div>
   )
@@ -880,7 +877,6 @@ function RestTimer({ restSeconds, onDismiss }) {
     setRemaining(r)
     if (r <= 0 && !alerted.current) { alerted.current = true; clearInterval(intervalRef.current); playBeep(); vibrate([300,100,300]) }
   }
-
   useEffect(() => { intervalRef.current = setInterval(tick, 500); return () => clearInterval(intervalRef.current) }, [])
 
   const addTime = (s) => { endRef.current = Math.max(Date.now(), endRef.current)+s*1000; alerted.current=false; tick() }
@@ -902,8 +898,7 @@ function RestTimer({ restSeconds, onDismiss }) {
             <svg width="88" height="88" viewBox="0 0 88 88">
               <circle cx="44" cy="44" r="36" fill="none" stroke="#222" strokeWidth="4"/>
               <circle cx="44" cy="44" r="36" fill="none" stroke={remaining < 10 ? '#EF4444' : WHITE} strokeWidth="4"
-                strokeDasharray={`${circ*pct} ${circ}`} strokeLinecap="round" transform="rotate(-90 44 44)"
-                style={{ transition: 'stroke-dasharray 0.4s linear' }}/>
+                strokeDasharray={`${circ*pct} ${circ}`} strokeLinecap="round" transform="rotate(-90 44 44)" style={{ transition: 'stroke-dasharray 0.4s linear' }}/>
             </svg>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: '18px', fontWeight: '700', color: remaining < 10 ? '#EF4444' : WHITE }}>{fmtTime(remaining)}</span>
@@ -947,20 +942,18 @@ function Sheet({ title, onClose, children }) {
 
 // ─── Body Weight ──────────────────────────────────────────────────────────────
 function BodyWeightSection() {
-  const [logs, setLogs] = useState([])
-  const [weight, setWeight] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [logs, setLogs]         = useState([])
+  const [weight, setWeight]     = useState('')
+  const [saving, setSaving]     = useState(false)
   const [todayLog, setTodayLog] = useState(null)
 
   useEffect(() => { load() }, [])
-
   const load = async () => {
     const { data } = await supabase.from('body_weight_logs').select('*').order('logged_date')
     setLogs(data || [])
     const td = data?.find(l => l.logged_date === TODAY)
     if (td) { setTodayLog(td); setWeight(String(td.weight_lbs)) }
   }
-
   const save = async () => {
     if (!weight) return
     setSaving(true)
@@ -993,7 +986,7 @@ function BodyWeightSection() {
           <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '280px', overflowY: 'auto' }}>
             {[...logs].reverse().map(l => (
               <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: `1px solid ${CARD2}` }}>
-                <p style={{ fontSize: '14px', color: l.logged_date === TODAY ? WHITE : GRAY }}>{new Date(l.logged_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                <p style={{ fontSize: '14px', color: l.logged_date === TODAY ? WHITE : GRAY }}>{new Date(l.logged_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
                 <p style={{ fontSize: '16px', fontWeight: '600', color: WHITE }}>{l.weight_lbs} <span style={{ fontSize: '12px', color: GRAY, fontWeight: '400' }}>lbs</span></p>
               </div>
             ))}
@@ -1009,23 +1002,27 @@ const labelStyle = { fontSize: '12px', color: GRAY, display: 'block', marginBott
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function Workout({ workoutActive, workoutElapsed, workoutRunning, onStartWorkout, onStopWorkout, onToggleTimer, recoveryScore }) {
-  const [programs, setPrograms]       = useState([])
-  const [todayLogs, setTodayLogs]     = useState({})
-  const [lastWeekLogs, setLastWeekLogs] = useState({})
-  const [selected, setSelected]       = useState(null)
-  const [loading, setLoading]         = useState(true)
-  const [restTimer, setRestTimer]     = useState(null)
-  const [activeSheet, setActiveSheet] = useState(null)
-  const [activeView, setActiveView]   = useState('training')
-  const [showWorkout, setShowWorkout] = useState(false)
-  const [editingProg, setEditingProg] = useState(null)
-  const [progForm, setProgForm]       = useState({ name: '', tag: 'Strength' })
+  const [programs, setPrograms]             = useState([])
+  const [todayLogs, setTodayLogs]           = useState({})
+  const [lastWeekLogs, setLastWeekLogs]     = useState({})
+  const [selected, setSelected]             = useState(null)       // program id
+  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState(null) // 0-6
+  const [loading, setLoading]               = useState(true)
+  const [restTimer, setRestTimer]           = useState(null)
+  const [activeSheet, setActiveSheet]       = useState(null)
+  const [activeView, setActiveView]         = useState('training')
+  const [showWorkout, setShowWorkout]       = useState(false)
+  const [editingProg, setEditingProg]       = useState(null)
+  const [progForm, setProgForm]             = useState({ name: '', tag: 'Strength' })
+  const [weeklyWorkoutDays, setWeeklyWorkoutDays] = useState(new Set())
+  const [workoutStreak, setWorkoutStreak]   = useState(0)
 
   useEffect(() => { loadAll() }, [])
 
   const loadAll = async () => {
     setLoading(true)
     try {
+      // Core data
       const [{ data: progs }, { data: exs }, { data: tLogs }, { data: lwLogs }] = await Promise.all([
         supabase.from('programs').select('*').order('id'),
         supabase.from('exercises').select('*').order('sort_order'),
@@ -1038,6 +1035,30 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
       setPrograms(progs?.map(p => ({ ...p, exercises: topLevel.filter(e => e.program_id === p.id) })) || [])
       const tMap = {}; tLogs?.forEach(l => { tMap[l.exercise_id] = l }); setTodayLogs(tMap)
       const lwMap = {}; lwLogs?.forEach(l => { if (!lwMap[l.exercise_id]) lwMap[l.exercise_id] = l }); setLastWeekLogs(lwMap)
+
+      // Weekly workout days (Sun–Sat of current week)
+      const d = new Date()
+      const sunOffset = d.getDate() - d.getDay()
+      const sunday = new Date(d); sunday.setDate(sunOffset)
+      const startOfWeek = `${sunday.getFullYear()}-${String(sunday.getMonth()+1).padStart(2,'0')}-${String(sunday.getDate()).padStart(2,'0')}`
+      const { data: weekData } = await supabase.from('workout_logs').select('logged_date').gte('logged_date', startOfWeek)
+      setWeeklyWorkoutDays(new Set(weekData?.map(l => l.logged_date) || []))
+
+      // Streak — consecutive weeks (Sun–Sat) with at least one log
+      const { data: streakData } = await supabase.from('workout_logs').select('logged_date').order('logged_date', { ascending: false }).limit(500)
+      const getWeekSunday = (dateStr) => {
+        const dt = new Date(dateStr + 'T12:00:00')
+        dt.setDate(dt.getDate() - dt.getDay())
+        return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`
+      }
+      const weeksWithLogs = new Set(streakData?.map(l => getWeekSunday(l.logged_date)) || [])
+      let streak = 0
+      const checkDt = new Date(); checkDt.setDate(checkDt.getDate() - checkDt.getDay())
+      while (true) {
+        const key = `${checkDt.getFullYear()}-${String(checkDt.getMonth()+1).padStart(2,'0')}-${String(checkDt.getDate()).padStart(2,'0')}`
+        if (weeksWithLogs.has(key)) { streak++; checkDt.setDate(checkDt.getDate() - 7) } else break
+      }
+      setWorkoutStreak(streak)
     } catch(e) { console.error(e) }
     setLoading(false)
   }
@@ -1080,11 +1101,16 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
     if (newDone) startRest(ex.rest_seconds || 90)
   }
 
-  const handleSelectProgram = (p) => setSelected(prev => prev === p.id ? null : p.id)
+  const handleSelectProgram = (p, dow) => {
+    if (selected === p.id && selectedDayOfWeek === dow) {
+      setSelected(null); setSelectedDayOfWeek(null)
+    } else {
+      setSelected(p.id); setSelectedDayOfWeek(dow)
+    }
+  }
 
-  const handleStartWorkout = () => { onStartWorkout(); setShowWorkout(true) }
-
-  const handleFinishWorkout = () => { onStopWorkout(); setSelected(null); setShowWorkout(false) }
+  const handleStartWorkout  = () => { onStartWorkout(); setShowWorkout(true) }
+  const handleFinishWorkout = () => { onStopWorkout(); setSelected(null); setSelectedDayOfWeek(null); setShowWorkout(false) }
 
   const saveProg = async () => {
     if (!progForm.name.trim()) return
@@ -1092,10 +1118,9 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
     else await supabase.from('programs').insert(progForm)
     setActiveSheet(null); loadAll()
   }
-
   const deleteProg = async () => {
     await supabase.from('programs').delete().eq('id', editingProg.id)
-    setSelected(null); setActiveSheet(null); loadAll()
+    setSelected(null); setSelectedDayOfWeek(null); setActiveSheet(null); loadAll()
   }
 
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
@@ -1111,20 +1136,9 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
     <div style={{ padding: '56px 20px calc(100px + env(safe-area-inset-bottom))', background: BG, minHeight: '100dvh', boxSizing: 'border-box' }}>
 
       {workoutActive && showWorkout && prog && (
-        <ActiveWorkoutScreen
-          prog={prog}
-          elapsed={workoutElapsed}
-          running={workoutRunning}
-          todayLogs={todayLogs}
-          lastWeekLogs={lastWeekLogs}
-          onToggle={onToggleTimer}
-          onBack={() => setShowWorkout(false)}
-          onFinish={handleFinishWorkout}
-          onLogSet={handleLogSet}
-          onToggleDone={handleToggleDone}
-          onStartRest={startRest}
-          onRefresh={loadAll}
-        />
+        <ActiveWorkoutScreen prog={prog} elapsed={workoutElapsed} running={workoutRunning} todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
+          onToggle={onToggleTimer} onBack={() => setShowWorkout(false)} onFinish={handleFinishWorkout}
+          onLogSet={handleLogSet} onToggleDone={handleToggleDone} onStartRest={startRest} onRefresh={loadAll}/>
       )}
 
       {restTimer && <RestTimer key={restTimer.key} restSeconds={restTimer.secs} onDismiss={() => setRestTimer(null)} />}
@@ -1134,6 +1148,12 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
         <div>
           <h1 style={{ fontSize: '34px', fontWeight: '800', color: WHITE, letterSpacing: '-1px', lineHeight: 1 }}>Training</h1>
           <p style={{ fontSize: '14px', color: GRAY, marginTop: '6px' }}>{dateStr}</p>
+          {workoutStreak > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }}>
+              <FireIcon size={13} color="#FF6B35"/>
+              <span style={{ fontSize: '13px', color: '#FF6B35', fontWeight: '600' }}>{workoutStreak} week streak</span>
+            </div>
+          )}
         </div>
         <button onClick={() => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setActiveSheet('prog') }}
           style={{ width: '40px', height: '40px', borderRadius: '12px', background: CARD, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1190,13 +1210,13 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
 
           <div style={{ marginBottom: '28px' }}>
             <p style={{ fontSize: '22px', fontWeight: '700', color: WHITE, marginBottom: '16px' }}>This Week</p>
-            <WeekStrip programs={programs} selectedId={selected} onSelect={handleSelectProgram} />
+            <WeekStrip programs={programs} selectedDayOfWeek={selectedDayOfWeek} onSelect={handleSelectProgram} />
           </div>
 
           {programs.length > 0 && (
             <div>
               <p style={{ fontSize: '22px', fontWeight: '700', color: WHITE, marginBottom: '16px' }}>Focus Areas</p>
-              <FocusAreas todayLogs={todayLogs} programs={programs} />
+              <ThisWeekSection weeklyWorkoutDays={weeklyWorkoutDays} workoutStreak={workoutStreak} todayLogs={todayLogs}/>
             </div>
           )}
         </>
