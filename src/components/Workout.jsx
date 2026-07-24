@@ -898,4 +898,179 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
         if (weeksWithLogs.has(key)) { streak++; checkDt.setDate(checkDt.getDate() - 7) } else break
       }
       setWorkoutStreak(streak)
-    } catch
+    } catch(e) { console.error(e) }
+    setLoading(false)
+  }
+
+  const prog = programs.find(p => p.id === selected)
+  const donePct = (() => {
+    if (!prog) return 0
+    const ids = prog.exercises.flatMap(e => [e.id, ...(e.variants||[]).map(v => v.id)])
+    return Math.round(ids.filter(id => todayLogs[id]?.done).length / Math.max(ids.length,1) * 100)
+  })()
+
+  const handleLogChange = async (exId, field, value) => {
+    setTodayLogs(prev => ({ ...prev, [exId]: { ...(prev[exId]||{}), [field]: value, exercise_id: exId } }))
+    const existing = todayLogs[exId]
+    if (existing?.id) { await supabase.from('workout_logs').update({ [field]: value }).eq('id', existing.id) }
+    else { const { data } = await supabase.from('workout_logs').insert({ exercise_id: exId, logged_date: TODAY, [field]: value }).select().single(); if (data) setTodayLogs(prev => ({ ...prev, [exId]: data })) }
+  }
+
+  const handleLogSet = async (exId, weight, reps, notes = '') => {
+    setTodayLogs(prev => ({ ...prev, [exId]: { ...(prev[exId]||{}), weight_used: weight, reps_done: reps, notes, done: true, exercise_id: exId } }))
+    const existing = todayLogs[exId]
+    if (existing?.id) { await supabase.from('workout_logs').update({ weight_used: weight, reps_done: reps, notes, done: true }).eq('id', existing.id) }
+    else { const { data } = await supabase.from('workout_logs').insert({ exercise_id: exId, logged_date: TODAY, weight_used: weight, reps_done: reps, notes, done: true }).select().single(); if (data) setTodayLogs(prev => ({ ...prev, [exId]: data })) }
+  }
+
+  const startRest       = (secs) => setRestTimer({ secs: getRecommendedRest(secs, recoveryScore), key: Date.now() })
+  const handleToggleDone = (ex) => { const newDone = !todayLogs[ex.id]?.done; handleLogChange(ex.id, 'done', newDone); if (newDone) startRest(ex.rest_seconds || 90) }
+  const handleSelectProgram = (p, dow) => {
+    if (selected === p.id && selectedDayOfWeek === dow) { setSelected(null); setSelectedDayOfWeek(null) }
+    else { setSelected(p.id); setSelectedDayOfWeek(dow) }
+  }
+  const handleStartWorkout  = () => { onStartWorkout(); setShowWorkout(true) }
+  const handleFinishWorkout = () => { onStopWorkout(); setSelected(null); setSelectedDayOfWeek(null); setShowWorkout(false) }
+  const saveProg = async () => {
+    if (!progForm.name.trim()) return
+    if (editingProg) await supabase.from('programs').update(progForm).eq('id', editingProg.id)
+    else await supabase.from('programs').insert(progForm)
+    setActiveSheet(null); loadAll()
+  }
+  const deleteProg = async () => {
+    await supabase.from('programs').delete().eq('id', editingProg.id)
+    setSelected(null); setSelectedDayOfWeek(null); setActiveSheet(null); loadAll()
+  }
+
+  const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ width: '36px', height: '36px', borderRadius: '50%', border: `3px solid ${CARD2}`, borderTop: `3px solid ${WHITE}`, animation: 'spin 1s linear infinite' }}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
+
+  return (
+    <div style={{ padding: '56px 20px calc(100px + env(safe-area-inset-bottom))', background: BG, minHeight: '100dvh', boxSizing: 'border-box' }}>
+
+      {workoutActive && showWorkout && prog && (
+        <ActiveWorkoutScreen prog={prog} elapsed={workoutElapsed} running={workoutRunning} todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
+          onToggle={onToggleTimer} onBack={() => setShowWorkout(false)} onFinish={handleFinishWorkout}
+          onLogSet={handleLogSet} onToggleDone={handleToggleDone} onStartRest={startRest} onRefresh={loadAll}/>
+      )}
+
+      {restTimer && <RestTimer key={restTimer.key} restSeconds={restTimer.secs} onDismiss={() => setRestTimer(null)} />}
+
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
+        <div>
+          <h1 style={{ fontSize: '34px', fontWeight: '800', color: WHITE, letterSpacing: '-1px', lineHeight: 1 }}>Training</h1>
+          <p style={{ fontSize: '14px', color: GRAY, marginTop: '6px' }}>{dateStr}</p>
+          {workoutStreak > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }}>
+              <FireIcon size={13} color="#FF6B35"/>
+              <span style={{ fontSize: '13px', color: '#FF6B35', fontWeight: '600' }}>{workoutStreak} week streak</span>
+            </div>
+          )}
+        </div>
+        <button onClick={() => setShowCoach(true)}
+          style={{ width: '40px', height: '40px', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: CARD, boxShadow: '0 0 16px rgba(99,102,241,0.5), 0 0 32px rgba(59,130,246,0.25)' }}>
+          <MustacheIcon size={26} />
+        </button>
+      </div>
+
+      {/* View toggle */}
+      <div style={{ display: 'flex', background: CARD, borderRadius: '14px', padding: '4px', marginBottom: '28px' }}>
+        {[{ id: 'training', label: 'Training' }, { id: 'weight', label: 'Body Weight' }].map(v => (
+          <button key={v.id} onClick={() => setActiveView(v.id)} style={{ flex: 1, padding: '10px', borderRadius: '10px', cursor: 'pointer', background: activeView === v.id ? WHITE : 'transparent', border: 'none', color: activeView === v.id ? '#111' : GRAY, fontSize: '14px', fontWeight: activeView === v.id ? '600' : '400', fontFamily: 'Inter, sans-serif', transition: 'all 0.2s' }}>{v.label}</button>
+        ))}
+      </div>
+
+      {activeView === 'weight' && <BodyWeightSection />}
+
+      {activeView === 'training' && (
+        <>
+          {prog ? (
+            <ProgressBorderCard pct={donePct}>
+              <div style={{ padding: '20px' }}>
+                <p style={{ fontSize: '13px', color: GRAY, marginBottom: '6px' }}>Today's Workout</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                  <p style={{ fontSize: '28px', fontWeight: '800', color: WHITE, letterSpacing: '-0.5px' }}>{prog.name}</p>
+                  <p style={{ fontSize: '38px', fontWeight: '800', color: WHITE, letterSpacing: '-1px' }}>{donePct}%</p>
+                </div>
+                <div style={{ display: 'flex', gap: '16px', marginBottom: '18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <DumbbellIcon color={GRAY} size={13}/>
+                    <span style={{ fontSize: '13px', color: GRAY }}>{prog.exercises.length} Exercises</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <TimerIcon color={GRAY}/>
+                    <span style={{ fontSize: '13px', color: GRAY }}>~52 min avg.</span>
+                  </div>
+                </div>
+                {workoutActive && !showWorkout ? (
+                  <button onClick={() => setShowWorkout(true)} style={{ ...PILL_BTN, width: '100%', padding: '16px', fontSize: '16px', background: CARD2, color: WHITE }}>
+                    {fmtTime(workoutElapsed)} · Resume <ArrowIcon color={WHITE}/>
+                  </button>
+                ) : (
+                  <button onClick={handleStartWorkout} style={{ ...PILL_BTN, width: '100%', padding: '16px', fontSize: '16px' }}>
+                    Start Workout <ArrowIcon color="#111"/>
+                  </button>
+                )}
+              </div>
+            </ProgressBorderCard>
+          ) : (
+            <div style={{ background: CARD, borderRadius: '20px', padding: '28px', marginBottom: '28px', textAlign: 'center' }}>
+              <p style={{ fontSize: '17px', fontWeight: '600', color: WHITE, marginBottom: '6px' }}>No workout selected</p>
+              <p style={{ fontSize: '14px', color: GRAY2 }}>Tap a day below to get started</p>
+            </div>
+          )}
+
+          <div style={{ marginBottom: '28px' }}>
+            <p style={{ fontSize: '22px', fontWeight: '700', color: WHITE, marginBottom: '16px' }}>This Week</p>
+            <WeekStrip
+              programs={programs}
+              selectedDayOfWeek={selectedDayOfWeek}
+              onSelect={handleSelectProgram}
+              onAddProgram={() => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setActiveSheet('prog') }}
+            />
+          </div>
+
+          {programs.length > 0 && (
+            <div>
+              <p style={{ fontSize: '22px', fontWeight: '700', color: WHITE, marginBottom: '16px' }}>Focus Areas</p>
+              <ThisWeekSection weeklyWorkoutDays={weeklyWorkoutDays} workoutStreak={workoutStreak} todayLogs={todayLogs}/>
+            </div>
+          )}
+        </>
+      )}
+
+      {showCoach && (
+        <Sheet title="AI Coach" onClose={() => setShowCoach(false)}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0 8px', gap: '16px' }}>
+            <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, #3B82F6, #6366F1)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 28px rgba(99,102,241,0.5)' }}>
+              <MustacheIcon size={36} />
+            </div>
+            <p style={{ fontSize: '16px', color: GRAY, textAlign: 'center', lineHeight: 1.6 }}>Your AI coach is coming soon. Once wired up it'll analyze your training history and give personalized recommendations on progressive overload, recovery, and what to train next.</p>
+          </div>
+        </Sheet>
+      )}
+
+      {activeSheet === 'prog' && (
+        <Sheet title={editingProg ? 'Edit program' : 'New program'} onClose={() => setActiveSheet(null)}>
+          <label style={labelStyle}>PROGRAM NAME</label>
+          <input style={inputStyle} placeholder="e.g. Push" value={progForm.name} onChange={e => setProgForm(f => ({ ...f, name: e.target.value }))}/>
+          <label style={labelStyle}>TYPE</label>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+            {['Strength','Cardio','Mobility','Sport'].map(t => (
+              <button key={t} onClick={() => setProgForm(f => ({ ...f, tag: t }))} style={{ flex: 1, padding: '10px', borderRadius: '12px', cursor: 'pointer', background: progForm.tag === t ? WHITE : CARD2, border: 'none', color: progForm.tag === t ? '#111' : GRAY, fontSize: '13px', fontFamily: 'Inter, sans-serif', fontWeight: progForm.tag === t ? '600' : '400' }}>{t}</button>
+            ))}
+          </div>
+          <button onClick={saveProg} style={{ ...PILL_BTN, width: '100%', marginBottom: '10px' }}>{editingProg ? 'Save changes' : 'Create program'} <ArrowIcon /></button>
+          {editingProg && <button onClick={deleteProg} style={{ ...GHOST_BTN, width: '100%', color: '#EF4444' }}>Delete program</button>}
+        </Sheet>
+      )}
+    </div>
+  )
+}
