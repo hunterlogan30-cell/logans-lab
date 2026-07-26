@@ -341,7 +341,7 @@ function WeekStrip({ programs, schedule, selectedDayOfWeek, onSelect, onAddProgr
   const days = Array.from({ length: 7 }, (_, i) => {
     const dow = (todayDow + i) % 7
     const progId = schedule[dow]
-    const prog = progId ? programs.find(p => p.id === progId) || null : null
+    const prog = progId ? programs.find(p => Number(p.id) === Number(progId)) || null : null
     return { dow, label: i === 0 ? 'Today' : LABELS[dow], prog }
   })
 
@@ -965,7 +965,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
       setPrograms(progs?.map(p => ({ ...p, exercises: topLevel.filter(e => e.program_id === p.id) })) || [])
       const tMap = {}; tLogs?.forEach(l => { tMap[l.exercise_id] = l }); setTodayLogs(tMap)
       const lwMap = {}; lwLogs?.forEach(l => { if (!lwMap[l.exercise_id]) lwMap[l.exercise_id] = l }); setLastWeekLogs(lwMap)
-      const schedMap = {}; sched?.forEach(s => { schedMap[s.day_of_week] = s.program_id }); setSchedule(schedMap)
+      const schedMap = {}; sched?.forEach(s => { schedMap[Number(s.day_of_week)] = Number(s.program_id) }); setSchedule(schedMap)
 
       // Weekly workout days
       const d = new Date(), sunOffset = d.getDate() - d.getDay(), sunday = new Date(d)
