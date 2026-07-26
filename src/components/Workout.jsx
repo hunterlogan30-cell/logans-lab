@@ -328,7 +328,7 @@ function ProgressBorderCard({ pct, children }) {
 }
 
 // ─── Week Strip ───────────────────────────────────────────────────────────────
-function WeekStrip({ programs, selectedDayOfWeek, onSelect, onAddProgram, onDeleteProgram }) {
+function WeekStrip({ programs, schedule, selectedDayOfWeek, onSelect, onAddProgram, onDeleteProgram }) {
   const LABELS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
   const todayDow = new Date().getDay()
   const [deletingDow, setDeletingDow] = useState(null)
@@ -340,7 +340,9 @@ function WeekStrip({ programs, selectedDayOfWeek, onSelect, onAddProgram, onDele
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const dow = (todayDow + i) % 7
-    return { dow, label: i === 0 ? 'Today' : LABELS[dow], prog: programs.length ? programs[i % programs.length] : null }
+    const progId = schedule[dow]
+    const prog = progId ? programs.find(p => p.id === progId) || null : null
+    return { dow, label: i === 0 ? 'Today' : LABELS[dow], prog }
   })
 
   const startPress  = (dow) => { pressTimer.current = setTimeout(() => { vibrate([30]); setDeletingDow(dow) }, 500) }
@@ -943,17 +945,19 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   const [weeklyWorkoutDays, setWeeklyWorkoutDays] = useState(new Set())
   const [workoutStreak, setWorkoutStreak]         = useState(0)
   const [confirmDeleteProg, setConfirmDeleteProg] = useState(null)
+  const [schedule, setSchedule]                   = useState({}) // { day_of_week: program_id }
 
   useEffect(() => { loadAll() }, [])
 
   const loadAll = async () => {
     setLoading(true)
     try {
-      const [{ data: progs }, { data: exs }, { data: tLogs }, { data: lwLogs }] = await Promise.all([
+      const [{ data: progs }, { data: exs }, { data: tLogs }, { data: lwLogs }, { data: sched }] = await Promise.all([
         supabase.from('programs').select('*').order('id'),
         supabase.from('exercises').select('*').order('sort_order'),
         supabase.from('workout_logs').select('*').eq('logged_date', TODAY),
         supabase.from('workout_logs').select('*').lt('logged_date', TODAY).order('logged_date', { ascending: false }).limit(200),
+        supabase.from('program_schedule').select('*'),
       ])
       const exMap = {}; const topLevel = []
       exs?.forEach(e => { exMap[e.id] = { ...e, variants: [] } })
@@ -961,6 +965,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
       setPrograms(progs?.map(p => ({ ...p, exercises: topLevel.filter(e => e.program_id === p.id) })) || [])
       const tMap = {}; tLogs?.forEach(l => { tMap[l.exercise_id] = l }); setTodayLogs(tMap)
       const lwMap = {}; lwLogs?.forEach(l => { if (!lwMap[l.exercise_id]) lwMap[l.exercise_id] = l }); setLastWeekLogs(lwMap)
+      const schedMap = {}; sched?.forEach(s => { schedMap[s.day_of_week] = s.program_id }); setSchedule(schedMap)
 
       // Weekly workout days
       const d = new Date(), sunOffset = d.getDate() - d.getDay(), sunday = new Date(d)
@@ -1018,8 +1023,21 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   const handleFinishWorkout = () => { onStopWorkout(); setSelected(null); setSelectedDayOfWeek(null); setShowWorkout(false) }
   const saveProg = async () => {
     if (!progForm.name.trim()) return
-    if (editingProg) await supabase.from('programs').update(progForm).eq('id', editingProg.id)
-    else await supabase.from('programs').insert(progForm)
+    let progId
+    if (editingProg) {
+      await supabase.from('programs').update({ name: progForm.name, tag: progForm.tag }).eq('id', editingProg.id)
+      progId = editingProg.id
+      await supabase.from('program_schedule').delete().eq('program_id', progId)
+    } else {
+      const { data } = await supabase.from('programs').insert({ name: progForm.name, tag: progForm.tag }).select().single()
+      progId = data?.id
+    }
+    if (progId && progForm.days.length > 0) {
+      await supabase.from('program_schedule').upsert(
+        progForm.days.map(dow => ({ program_id: progId, day_of_week: dow })),
+        { onConflict: 'day_of_week' }
+      )
+    }
     setActiveSheet(null); loadAll()
   }
   const deleteProg = async () => {
@@ -1116,9 +1134,10 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
             <p style={{ fontSize: '22px', fontWeight: '700', color: WHITE, marginBottom: '16px' }}>This Week</p>
             <WeekStrip
               programs={programs}
+              schedule={schedule}
               selectedDayOfWeek={selectedDayOfWeek}
               onSelect={handleSelectProgram}
-              onAddProgram={() => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength' }); setActiveSheet('prog') }}
+              onAddProgram={() => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength', days: [] }); setActiveSheet('prog') }}
               onDeleteProgram={(prog) => { if (prog) setConfirmDeleteProg(prog) }}
             />
           </div>
@@ -1157,10 +1176,23 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
           <label style={labelStyle}>PROGRAM NAME</label>
           <input style={inputStyle} placeholder="e.g. Push" value={progForm.name} onChange={e => setProgForm(f => ({ ...f, name: e.target.value }))}/>
           <label style={labelStyle}>TYPE</label>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
             {['Strength','Cardio','Mobility','Sport'].map(t => (
               <button key={t} onClick={() => setProgForm(f => ({ ...f, tag: t }))} style={{ flex: 1, padding: '10px', borderRadius: '12px', cursor: 'pointer', background: progForm.tag === t ? WHITE : CARD2, border: 'none', color: progForm.tag === t ? '#111' : GRAY, fontSize: '13px', fontFamily: 'Inter, sans-serif', fontWeight: progForm.tag === t ? '600' : '400' }}>{t}</button>
             ))}
+          </div>
+          <label style={labelStyle}>DAYS</label>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+            {['S','M','T','W','T','F','S'].map((d, i) => {
+              const selected = progForm.days.includes(i)
+              const takenByOther = schedule[i] && schedule[i] !== editingProg?.id
+              return (
+                <button key={i} onClick={() => {
+                  if (takenByOther) return
+                  setProgForm(f => ({ ...f, days: selected ? f.days.filter(x => x !== i) : [...f.days, i] }))
+                }} style={{ flex: 1, padding: '10px 0', borderRadius: '12px', cursor: takenByOther ? 'not-allowed' : 'pointer', background: selected ? '#6366F1' : CARD2, border: 'none', color: selected ? WHITE : takenByOther ? '#333' : GRAY, fontSize: '13px', fontFamily: 'Inter, sans-serif', fontWeight: selected ? '700' : '400', opacity: takenByOther ? 0.4 : 1 }}>{d}</button>
+              )
+            })}
           </div>
           <button onClick={saveProg} style={{ ...PILL_BTN, width: '100%', marginBottom: '10px' }}>{editingProg ? 'Save changes' : 'Create program'} <ArrowIcon /></button>
           {editingProg && <button onClick={deleteProg} style={{ ...GHOST_BTN, width: '100%', color: '#EF4444' }}>Delete program</button>}
