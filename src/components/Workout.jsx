@@ -965,7 +965,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
       setPrograms(progs?.map(p => ({ ...p, exercises: topLevel.filter(e => e.program_id === p.id) })) || [])
       const tMap = {}; tLogs?.forEach(l => { tMap[l.exercise_id] = l }); setTodayLogs(tMap)
       const lwMap = {}; lwLogs?.forEach(l => { if (!lwMap[l.exercise_id]) lwMap[l.exercise_id] = l }); setLastWeekLogs(lwMap)
-      const schedMap = {}; sched?.forEach(s => { schedMap[Number(s.day_of_week)] = Number(s.program_id) }); setSchedule(schedMap)
+      console.log("SCHED RAW:", sched); const schedMap = {}; sched?.forEach(s => { schedMap[Number(s.day_of_week)] = Number(s.program_id) }); setSchedule(schedMap)
 
       // Weekly workout days
       const d = new Date(), sunOffset = d.getDate() - d.getDay(), sunday = new Date(d)
