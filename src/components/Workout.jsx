@@ -328,7 +328,7 @@ function ProgressBorderCard({ pct, children }) {
 }
 
 // ─── Week Strip ───────────────────────────────────────────────────────────────
-function WeekStrip({ programs, schedule, selectedDayOfWeek, onSelect, onAddProgram, onDeleteProgram }) {
+function WeekStrip({ programs, schedule, progAvgDuration, selectedDayOfWeek, onSelect, onAddProgram, onDeleteProgram }) {
   const LABELS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
   const todayDow = new Date().getDay()
   const [deletingDow, setDeletingDow] = useState(null)
@@ -341,7 +341,7 @@ function WeekStrip({ programs, schedule, selectedDayOfWeek, onSelect, onAddProgr
   const days = Array.from({ length: 7 }, (_, i) => {
     const dow = (todayDow + i) % 7
     const progId = schedule[dow]
-    const prog = progId ? programs.find(p => Number(p.id) === Number(progId)) || null : null
+    const prog = progId ? programs.find(p => p.id === progId) || null : null
     return { dow, label: i === 0 ? 'Today' : LABELS[dow], prog }
   })
 
@@ -416,7 +416,7 @@ function WeekStrip({ programs, schedule, selectedDayOfWeek, onSelect, onAddProgr
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <TimerIcon color={isSelected ? '#777' : GRAY2}/>
-                <span style={{ fontSize: '12px', color: isSelected ? '#777' : GRAY2 }}>~52 min avg.</span>
+                <span style={{ fontSize: '12px', color: isSelected ? '#777' : GRAY2 }}>{progAvgDuration[prog?.id] ? `~${Math.round(progAvgDuration[prog.id] / 60)} min avg.` : '~52 min avg.'}</span>
               </div>
             </div>
 
@@ -946,6 +946,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   const [workoutStreak, setWorkoutStreak]         = useState(0)
   const [confirmDeleteProg, setConfirmDeleteProg] = useState(null)
   const [schedule, setSchedule]                   = useState({}) // { day_of_week: program_id }
+  const [progAvgDuration, setProgAvgDuration]     = useState({})
 
   useEffect(() => { loadAll() }, [])
 
@@ -965,7 +966,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
       setPrograms(progs?.map(p => ({ ...p, exercises: topLevel.filter(e => e.program_id === p.id) })) || [])
       const tMap = {}; tLogs?.forEach(l => { tMap[l.exercise_id] = l }); setTodayLogs(tMap)
       const lwMap = {}; lwLogs?.forEach(l => { if (!lwMap[l.exercise_id]) lwMap[l.exercise_id] = l }); setLastWeekLogs(lwMap)
-      const schedMap = {}; sched?.forEach(s => { schedMap[Number(s.day_of_week)] = Number(s.program_id) }); setSchedule(schedMap)
+      const schedMap = {}; sched?.forEach(s => { schedMap[s.day_of_week] = s.program_id }); setSchedule(schedMap)
 
       // Weekly workout days
       const d = new Date(), sunOffset = d.getDate() - d.getDay(), sunday = new Date(d)
@@ -1020,7 +1021,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
     else { setSelected(p.id); setSelectedDayOfWeek(dow) }
   }
   const handleStartWorkout  = () => { onStartWorkout(); setShowWorkout(true) }
-  const handleFinishWorkout = () => { onStopWorkout(); setSelected(null); setSelectedDayOfWeek(null); setShowWorkout(false) }
+  const handleFinishWorkout = async () => { if (selected && workoutElapsed > 60) { await supabase.from("workout_sessions").insert({ program_id: selected, logged_date: TODAY, duration_seconds: workoutElapsed }) }; onStopWorkout(); setSelected(null); setSelectedDayOfWeek(null); setShowWorkout(false) }
   const saveProg = async () => {
     if (!progForm.name.trim()) return
     let progId
@@ -1109,7 +1110,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <TimerIcon color={GRAY}/>
-                    <span style={{ fontSize: '13px', color: GRAY }}>~52 min avg.</span>
+                    <span style={{ fontSize: '13px', color: GRAY }}>{progAvgDuration[prog?.id] ? `~${Math.round(progAvgDuration[prog.id] / 60)} min avg.` : '~52 min avg.'}</span>
                   </div>
                 </div>
                 {workoutActive && !showWorkout ? (
@@ -1135,6 +1136,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
             <WeekStrip
               programs={programs}
               schedule={schedule}
+              progAvgDuration={progAvgDuration}
               selectedDayOfWeek={selectedDayOfWeek}
               onSelect={handleSelectProgram}
               onAddProgram={() => { setEditingProg(null); setProgForm({ name: '', tag: 'Strength', days: [] }); setActiveSheet('prog') }}
