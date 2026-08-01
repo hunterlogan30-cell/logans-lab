@@ -117,7 +117,7 @@ const MustacheIcon = ({ size = 20 }) => (
 function AnalyticsChart({ logs }) {
   const containerRef = useRef(null)
   const canvasRef    = useRef(null)
-  const validLogs    = logs.filter(l => l.weight_used && !isNaN(parseFloat(l.weight_used)))
+  const validLogs    = logs.filter(l => (l.weight_lbs || l.weight_used) && !isNaN(parseFloat(l.weight_lbs || l.weight_used)))
 
   useEffect(() => {
     const draw = () => {
@@ -130,7 +130,7 @@ function AnalyticsChart({ logs }) {
       canvas.style.width = W + 'px'; canvas.style.height = H + 'px'
       const ctx = canvas.getContext('2d')
       ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H)
-      const weights = validLogs.map(l => parseFloat(l.weight_used))
+      const weights = validLogs.map(l => parseFloat(l.weight_lbs || l.weight_used))
       const minW = Math.min(...weights) * 0.92
       const maxW = Math.max(...weights) * 1.05
       const range = maxW - minW || 1
@@ -565,7 +565,11 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
 
   useEffect(() => {
     const fetch = async () => {
-      const { data } = await supabase.from('workout_logs').select('*').eq('exercise_id', ex.id).not('weight_used', 'is', null).order('logged_date', { ascending: true }).limit(30)
+      const { data } = await supabase.from('workout_set_logs').select('*')
+        .eq('exercise_id', ex.id)
+        .not('weight_lbs', 'is', null)
+        .order('logged_date', { ascending: true })
+        .limit(200)
       setHistoricalLogs(data || [])
     }
     fetch()
@@ -582,16 +586,37 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
   const toggleSetDone = (idx) => {
     const updated = sets.map((s,i) => i === idx ? { ...s, done: !s.done } : s); setSets(updated)
     const s = updated[idx]
-    if (updated[idx].done && s.weight && s.reps) { onLogSet(ex.id, s.weight, s.reps, notes); onStartRest(ex.rest_seconds || 90) }
+    if (updated[idx].done && s.weight && s.reps) { onLogSet(ex.id, s.weight, s.reps, notes, idx + 1); onStartRest(ex.rest_seconds || 90) }
   }
   const deleteSet = () => { setSets(prev => prev.filter((_,i) => i !== confirmSet)); setConfirmSet(null) }
   const addSet    = () => { const last = sets[sets.length-1]; setSets(prev => [...prev, { weight: last?.weight || '', reps: last?.reps || ex.reps || '', done: false }]) }
   const allDone   = sets.length > 0 && sets.every(s => s.done)
 
-  const validHistorical = historicalLogs.filter(l => l.weight_used)
-  const best1RM  = validHistorical.length > 0 ? Math.max(...validHistorical.map(l => calc1RM(l.weight_used, l.reps_done))) : 0
-  const today1RM = calc1RM(log?.weight_used, log?.reps_done)
-  const isNewPR  = today1RM > 0 && today1RM >= best1RM && validHistorical.length > 1
+  const validHistorical = historicalLogs.filter(l => l.weight_lbs)
+
+  // Best 1RM per day (average top sets), then all-time best
+  const byDate = {}
+  validHistorical.forEach(l => {
+    const rm = calc1RM(l.weight_lbs, l.reps)
+    if (!byDate[l.logged_date] || rm > byDate[l.logged_date]) byDate[l.logged_date] = rm
+  })
+  const dailyBest = Object.values(byDate)
+  const best1RM   = dailyBest.length > 0 ? Math.max(...dailyBest) : 0
+
+  // Today's best 1RM from current sets
+  const today1RM = sets.filter(s => s.done && s.weight && s.reps)
+    .reduce((best, s) => Math.max(best, calc1RM(s.weight, s.reps)), 0)
+  const isNewPR = today1RM > 0 && today1RM > best1RM && dailyBest.length > 0
+
+  // Chart data: best weight per day
+  const byDateWeight = {}
+  validHistorical.forEach(l => {
+    const w = parseFloat(l.weight_lbs)
+    if (!byDateWeight[l.logged_date] || w > byDateWeight[l.logged_date]) byDateWeight[l.logged_date] = w
+  })
+  const chartLogs = Object.entries(byDateWeight)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([logged_date, weight_lbs]) => ({ logged_date, weight_lbs }))
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: BG, overflowY: 'auto', animation: 'slideInRight 0.25s cubic-bezier(0.32,0.72,0,1)' }}>
@@ -634,10 +659,10 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
         </div>
         <div style={{ background: CARD2, borderRadius: '16px', padding: '16px 18px' }}>
           <p style={{ fontSize: '12px', color: GRAY, marginBottom: '12px' }}>Weight Progression</p>
-          <AnalyticsChart logs={validHistorical}/>
-          {validHistorical.length >= 2 && (
+          <AnalyticsChart logs={chartLogs}/>
+          {chartLogs.length >= 2 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-              <p style={{ fontSize: '11px', color: GRAY2 }}>{new Date(validHistorical[0].logged_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+              <p style={{ fontSize: '11px', color: GRAY2 }}>{new Date(chartLogs[0].logged_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
               <p style={{ fontSize: '11px', color: GRAY2 }}>Today</p>
             </div>
           )}
@@ -804,7 +829,7 @@ function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, 
           <p style={{ fontSize: '17px', fontWeight: '500', color: GRAY }}>Add exercises</p>
         </div>
       </div>
-      {activeEx && <ExerciseDetailScreen ex={activeEx} log={todayLogs[activeEx.id]} lastLog={lastWeekLogs[activeEx.id]} onBack={() => setActiveEx(null)} onLogSet={(exId, w, r, n) => onLogSet(exId, w, r, n)} onStartRest={onStartRest} onDelete={() => { setActiveEx(null); setConfirmEx(activeEx) }}/>}
+      {activeEx && <ExerciseDetailScreen ex={activeEx} log={todayLogs[activeEx.id]} lastLog={lastWeekLogs[activeEx.id]} onBack={() => setActiveEx(null)} onLogSet={(exId, w, r, n, sn) => onLogSet(exId, w, r, n, sn)} onStartRest={onStartRest} onDelete={() => { setActiveEx(null); setConfirmEx(activeEx) }}/>}
       {showLibrary && <ExerciseLibrary myExercises={prog.exercises} programId={prog.id} onAdded={onRefresh} onClose={() => setShowLibrary(false)}/>}
       {confirmEx && <ConfirmDeleteModal title={`Delete "${confirmEx.name}"?`} subtitle="This will remove the exercise from your program. All logged data will be lost." onConfirm={handleDeleteExercise} onCancel={() => setConfirmEx(null)}/>}
     </div>
@@ -1007,11 +1032,19 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
     else { const { data } = await supabase.from('workout_logs').insert({ exercise_id: exId, logged_date: TODAY, [field]: value }).select().single(); if (data) setTodayLogs(prev => ({ ...prev, [exId]: data })) }
   }
 
-  const handleLogSet = async (exId, weight, reps, notes = '') => {
+  const handleLogSet = async (exId, weight, reps, notes = '', setNumber = 1) => {
     setTodayLogs(prev => ({ ...prev, [exId]: { ...(prev[exId]||{}), weight_used: weight, reps_done: reps, notes, done: true, exercise_id: exId } }))
     const existing = todayLogs[exId]
     if (existing?.id) { await supabase.from('workout_logs').update({ weight_used: weight, reps_done: reps, notes, done: true }).eq('id', existing.id) }
     else { const { data } = await supabase.from('workout_logs').insert({ exercise_id: exId, logged_date: TODAY, weight_used: weight, reps_done: reps, notes, done: true }).select().single(); if (data) setTodayLogs(prev => ({ ...prev, [exId]: data })) }
+    // Save individual set
+    await supabase.from('workout_set_logs').insert({
+      exercise_id: exId,
+      logged_date: TODAY,
+      set_number: setNumber,
+      weight_lbs: parseFloat(weight) || null,
+      reps: parseInt(String(reps).split('-')[0]) || null,
+    })
   }
 
   const startRest       = (secs) => setRestTimer({ secs: getRecommendedRest(secs, recoveryScore), key: Date.now() })
