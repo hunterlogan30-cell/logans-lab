@@ -559,9 +559,7 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
   const [picker, setPicker]         = useState(null)
   const [confirmSet, setConfirmSet] = useState(null)
   const [historicalLogs, setHistoricalLogs] = useState([])
-  const [showRestSheet, setShowRestSheet]   = useState(false)
-  const [restSecs, setRestSecs]     = useState(ex.rest_seconds || 90)
-  const [savingRest, setSavingRest] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
     const fetch = async () => {
@@ -574,12 +572,6 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
     }
     fetch()
   }, [ex.id])
-
-  const saveRestTime = async () => {
-    setSavingRest(true)
-    await supabase.from('exercises').update({ rest_seconds: restSecs }).eq('id', ex.id)
-    setSavingRest(false); setShowRestSheet(false)
-  }
 
   const openPicker    = (setIdx, field) => setPicker({ setIdx, field })
   const savePicker    = (val) => { if (!picker) return; setSets(prev => prev.map((s,i) => i === picker.setIdx ? { ...s, [picker.field]: val } : s)); setPicker(null) }
@@ -623,7 +615,7 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
       <style>{`@keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '56px 20px 20px' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}><BackIcon /></button>
-        <button onClick={() => setShowRestSheet(true)} style={{ width: '40px', height: '40px', borderRadius: '50%', background: CARD2, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><GearIcon color={GRAY} size={18}/></button>
+        <button onClick={() => setShowSettings(true)} style={{ width: '40px', height: '40px', borderRadius: '50%', background: CARD2, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><GearIcon color={GRAY} size={18}/></button>
       </div>
       <div style={{ padding: '0 20px 28px' }}>
         <h1 style={{ fontSize: '32px', fontWeight: '800', color: allDone ? GRAY : WHITE, letterSpacing: '-0.5px', lineHeight: 1.1 }}>{ex.name}</h1>
@@ -669,30 +661,132 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
         </div>
       </div>
       {confirmSet !== null && <ConfirmDeleteModal title="Delete this set?" subtitle="All data for this set will be lost." onConfirm={deleteSet} onCancel={() => setConfirmSet(null)}/>}
-      {showRestSheet && (
-        <>
-          <div onClick={() => setShowRestSheet(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 600, backdropFilter: 'blur(4px)' }}/>
-          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 601, background: '#1a1a1a', borderRadius: '24px 24px 0 0', padding: '20px 24px calc(44px + env(safe-area-inset-bottom))' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}><div style={{ width: '36px', height: '4px', borderRadius: '2px', background: CARD2 }}/></div>
-            <p style={{ fontSize: '20px', fontWeight: '700', color: WHITE, marginBottom: '4px' }}>Rest Time</p>
-            <p style={{ fontSize: '13px', color: GRAY, marginBottom: '24px' }}>How long to rest between sets for {ex.name}</p>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
-              {[60, 90, 120, 180].map(s => (
-                <button key={s} onClick={() => setRestSecs(s)} style={{ flex: 1, padding: '12px 0', borderRadius: '12px', background: restSecs === s ? WHITE : CARD2, border: 'none', color: restSecs === s ? '#111' : GRAY, fontSize: '13px', fontWeight: restSecs === s ? '700' : '400', fontFamily: 'Inter, sans-serif', cursor: 'pointer' }}>
-                  {s < 60 ? `${s}s` : `${s/60}m`}
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '28px', marginBottom: '28px' }}>
-              <button onClick={() => setRestSecs(s => Math.max(15, s - 15))} style={{ width: '52px', height: '52px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-              <p style={{ fontSize: '52px', fontWeight: '800', color: WHITE, letterSpacing: '-1px', minWidth: '110px', textAlign: 'center' }}>{fmtTime(restSecs)}</p>
-              <button onClick={() => setRestSecs(s => s + 15)} style={{ width: '52px', height: '52px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
-            </div>
-            <button onClick={saveRestTime} disabled={savingRest} style={{ ...PILL_BTN, width: '100%', opacity: savingRest ? 0.7 : 1 }}>{savingRest ? 'Saving...' : 'Save'} {!savingRest && <ArrowIcon />}</button>
-          </div>
-        </>
+      {showSettings && (
+        <ExerciseSettingsScreen
+          initialData={ex}
+          onSave={() => setShowSettings(false)}
+          onClose={() => setShowSettings(false)}
+        />
       )}
       {picker && <NumberPicker label={picker.field === 'weight' ? 'Weight (lbs)' : 'Reps'} value={sets[picker.setIdx][picker.field]} isReps={picker.field === 'reps'} onSave={savePicker} onClose={() => setPicker(null)}/>}
+    </div>
+  )
+}
+
+// ─── Exercise Settings Screen ─────────────────────────────────────────────────
+function ExerciseSettingsScreen({ initialData, programId, onSave, onClose }) {
+  const [name, setName]         = useState(initialData?.name || '')
+  const [sets, setSetsVal]      = useState(initialData?.sets || 4)
+  const [repsMode, setRepsMode] = useState('reps')
+  const [reps, setReps]         = useState(String(initialData?.reps || '8-10'))
+  const [timeMins, setTimeMins] = useState(0)
+  const [timeSecs, setTimeSecs] = useState(30)
+  const [weight, setWeight]     = useState(String(initialData?.weight || ''))
+  const [restSecs, setRestSecs] = useState(initialData?.rest_seconds || 90)
+  const [saving, setSaving]     = useState(false)
+  const REST_PRESETS = [60, 90, 120, 180]
+
+  const handleSave = async () => {
+    if (!name.trim()) return
+    setSaving(true)
+    const repsValue = repsMode === 'time' ? `${timeMins}:${String(timeSecs).padStart(2,'0')}` : reps
+    if (initialData?.id) {
+      await supabase.from('exercises').update({ name, sets: sets, reps: repsValue, weight, rest_seconds: restSecs }).eq('id', initialData.id)
+    } else {
+      await supabase.from('exercises').insert({ name, sets: sets, reps: repsValue, weight, rest_seconds: restSecs, program_id: programId })
+    }
+    setSaving(false); onSave()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: BG, overflowY: 'auto', animation: 'slideInRight 0.25s cubic-bezier(0.32,0.72,0,1)' }}>
+      {/* Top bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '56px 20px 24px' }}>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}><BackIcon /></button>
+        <p style={{ fontSize: '17px', fontWeight: '600', color: WHITE }}>{initialData?.id ? 'Edit Exercise' : 'New Exercise'}</p>
+        <button onClick={handleSave} disabled={saving || !name.trim()}
+          style={{ background: name.trim() ? WHITE : CARD2, color: '#111', border: 'none', borderRadius: '100px', padding: '10px 20px', fontSize: '15px', fontWeight: '600', fontFamily: 'Inter, sans-serif', cursor: name.trim() ? 'pointer' : 'default', opacity: saving ? 0.7 : 1 }}>
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+      </div>
+
+      <div style={{ padding: '0 20px calc(60px + env(safe-area-inset-bottom))' }}>
+        {/* Name */}
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Exercise name" autoFocus
+          style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: `2px solid ${CARD2}`, color: WHITE, fontSize: '28px', fontWeight: '700', fontFamily: 'Inter, sans-serif', outline: 'none', paddingBottom: '16px', marginBottom: '40px', boxSizing: 'border-box', letterSpacing: '-0.5px' }}/>
+
+        {/* Sets */}
+        <p style={{ fontSize: '12px', color: GRAY, fontWeight: '500', marginBottom: '14px' }}>SETS</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: CARD, borderRadius: '16px', padding: '16px 24px', marginBottom: '28px' }}>
+          <button onClick={() => setSetsVal(s => Math.max(1, s - 1))} style={{ width: '48px', height: '48px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+          <p style={{ fontSize: '56px', fontWeight: '800', color: WHITE, letterSpacing: '-2px' }}>{sets}</p>
+          <button onClick={() => setSetsVal(s => s + 1)} style={{ width: '48px', height: '48px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+        </div>
+
+        {/* Reps / Time toggle */}
+        <div style={{ display: 'flex', background: CARD, borderRadius: '14px', padding: '4px', marginBottom: '14px' }}>
+          {['reps', 'time'].map(m => (
+            <button key={m} onClick={() => setRepsMode(m)}
+              style={{ flex: 1, padding: '10px', borderRadius: '10px', background: repsMode === m ? WHITE : 'transparent', border: 'none', color: repsMode === m ? '#111' : GRAY, fontSize: '14px', fontWeight: repsMode === m ? '600' : '400', fontFamily: 'Inter, sans-serif', cursor: 'pointer', textTransform: 'capitalize' }}>
+              {m === 'reps' ? 'Reps' : 'Time'}
+            </button>
+          ))}
+        </div>
+
+        {repsMode === 'reps' ? (
+          <div style={{ background: CARD, borderRadius: '16px', padding: '20px', marginBottom: '28px' }}>
+            <p style={{ fontSize: '12px', color: GRAY, marginBottom: '12px', fontWeight: '500' }}>TARGET REPS</p>
+            <input value={reps} onChange={e => setReps(e.target.value)} placeholder="e.g. 8-10"
+              style={{ width: '100%', background: 'transparent', border: 'none', color: WHITE, fontSize: '40px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', letterSpacing: '-0.5px', boxSizing: 'border-box', marginBottom: '8px' }}/>
+            <p style={{ fontSize: '12px', color: GRAY2 }}>Use a range like 8-10 or a fixed number like 12</p>
+          </div>
+        ) : (
+          <div style={{ background: CARD, borderRadius: '16px', padding: '24px 20px', marginBottom: '28px' }}>
+            <p style={{ fontSize: '12px', color: GRAY, marginBottom: '20px', fontWeight: '500' }}>TARGET TIME</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                <button onClick={() => setTimeMins(m => m + 1)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                <p style={{ fontSize: '56px', fontWeight: '800', color: WHITE, letterSpacing: '-2px', minWidth: '72px', textAlign: 'center' }}>{String(timeMins).padStart(2,'0')}</p>
+                <button onClick={() => setTimeMins(m => Math.max(0, m - 1))} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                <p style={{ fontSize: '12px', color: GRAY }}>min</p>
+              </div>
+              <p style={{ fontSize: '48px', color: GRAY, fontWeight: '300', alignSelf: 'center', marginBottom: '32px' }}>:</p>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                <button onClick={() => setTimeSecs(s => Math.min(55, s + 5))} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                <p style={{ fontSize: '56px', fontWeight: '800', color: WHITE, letterSpacing: '-2px', minWidth: '72px', textAlign: 'center' }}>{String(timeSecs).padStart(2,'0')}</p>
+                <button onClick={() => setTimeSecs(s => Math.max(0, s - 5))} style={{ width: '44px', height: '44px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                <p style={{ fontSize: '12px', color: GRAY }}>sec</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Target weight */}
+        <p style={{ fontSize: '12px', color: GRAY, fontWeight: '500', marginBottom: '14px' }}>TARGET WEIGHT</p>
+        <div style={{ background: CARD, borderRadius: '16px', padding: '20px', marginBottom: '28px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="0"
+            style={{ flex: 1, background: 'transparent', border: 'none', color: WHITE, fontSize: '40px', fontWeight: '800', fontFamily: 'Inter, sans-serif', outline: 'none', letterSpacing: '-0.5px' }}/>
+          <p style={{ fontSize: '18px', color: GRAY, fontWeight: '500' }}>lbs</p>
+        </div>
+
+        {/* Rest time */}
+        <p style={{ fontSize: '12px', color: GRAY, fontWeight: '500', marginBottom: '14px' }}>REST TIME</p>
+        <div style={{ background: CARD, borderRadius: '16px', padding: '20px', marginBottom: '32px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+            {REST_PRESETS.map(s => (
+              <button key={s} onClick={() => setRestSecs(s)}
+                style={{ flex: 1, padding: '10px 0', borderRadius: '12px', background: restSecs === s ? WHITE : CARD2, border: 'none', color: restSecs === s ? '#111' : GRAY, fontSize: '13px', fontWeight: restSecs === s ? '700' : '400', fontFamily: 'Inter, sans-serif', cursor: 'pointer' }}>
+                {s < 60 ? `${s}s` : `${s/60}m`}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '24px' }}>
+            <button onClick={() => setRestSecs(s => Math.max(15, s - 15))} style={{ width: '48px', height: '48px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+            <p style={{ fontSize: '48px', fontWeight: '800', color: WHITE, letterSpacing: '-1px', minWidth: '110px', textAlign: 'center' }}>{fmtTime(restSecs)}</p>
+            <button onClick={() => setRestSecs(s => s + 15)} style={{ width: '48px', height: '48px', borderRadius: '50%', background: CARD2, border: 'none', color: WHITE, fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -700,11 +794,7 @@ function ExerciseDetailScreen({ ex, log, lastLog, onBack, onLogSet, onStartRest,
 // ─── Exercise Library ─────────────────────────────────────────────────────────
 function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
   const [search, setSearch]       = useState('')
-  const [adding, setAdding]       = useState(false)
-  const [newName, setNewName]     = useState('')
-  const [newSets, setNewSets]     = useState('4')
-  const [newReps, setNewReps]     = useState('8-10')
-  const [newWeight, setNewWeight] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
   const [saving, setSaving]       = useState(false)
 
   const myNames = myExercises.map(e => e.name.toLowerCase())
@@ -720,68 +810,54 @@ function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
     await supabase.from('exercises').insert({ name: ex.name, sets: 4, reps: '8-10', weight: '', rest_seconds: 90, program_id: programId })
     setSaving(false); onAdded(); onClose()
   }
-  const handleCreateNew = async () => {
-    if (!newName.trim()) return
-    setSaving(true)
-    await supabase.from('exercises').insert({ name: newName, sets: parseInt(newSets)||4, reps: newReps, weight: newWeight, rest_seconds: 90, program_id: programId })
-    setSaving(false); onAdded(); onClose()
-  }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: BG, display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s cubic-bezier(0.32,0.72,0,1)' }}>
-      <style>{`@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '56px 20px 16px', flexShrink: 0 }}>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}><BackIcon /></button>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => setAdding(a => !a)} style={{ width: '40px', height: '40px', borderRadius: '50%', background: CARD2, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><PlusIcon size={18} color={WHITE}/></button>
-          <button onClick={onClose} style={{ ...GHOST_BTN, padding: '10px 20px' }}>Done</button>
+    <>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: BG, display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s cubic-bezier(0.32,0.72,0,1)' }}>
+        <style>{`@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '56px 20px 16px', flexShrink: 0 }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}><BackIcon /></button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={() => setShowCreate(true)} style={{ width: '40px', height: '40px', borderRadius: '50%', background: CARD2, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><PlusIcon size={18} color={WHITE}/></button>
+            <button onClick={onClose} style={{ ...GHOST_BTN, padding: '10px 20px' }}>Done</button>
+          </div>
         </div>
-      </div>
-      <div style={{ padding: '0 20px 16px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: CARD2, borderRadius: '100px', padding: '12px 18px' }}>
-          <SearchIcon />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
-            style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', flex: 1 }}/>
-          {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: GRAY, fontSize: '20px', lineHeight: 1 }}>×</button>}
+        <div style={{ padding: '0 20px 16px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: CARD2, borderRadius: '100px', padding: '12px 18px' }}>
+            <SearchIcon />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
+              style={{ background: 'transparent', border: 'none', color: WHITE, fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', flex: 1 }}/>
+            {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: GRAY, fontSize: '20px', lineHeight: 1 }}>×</button>}
+          </div>
         </div>
-      </div>
-      {adding && (
-        <div style={{ padding: '12px 20px 16px', flexShrink: 0, background: CARD2, marginBottom: '2px' }}>
-          <p style={{ fontSize: '12px', color: GRAY, marginBottom: '10px', fontWeight: '500' }}>NEW EXERCISE</p>
-          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Exercise name"
-            style={{ width: '100%', background: CARD, borderRadius: '12px', border: 'none', padding: '12px 14px', color: WHITE, fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box', marginBottom: '8px' }}/>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-            {[['Sets', newSets, setNewSets, 'number'], ['Reps', newReps, setNewReps, 'text'], ['Weight', newWeight, setNewWeight, 'number']].map(([l, v, s, t]) => (
-              <div key={l}>
-                <p style={{ fontSize: '11px', color: GRAY2, marginBottom: '4px' }}>{l}</p>
-                <input type={t} value={v} onChange={e => s(e.target.value)} placeholder={l}
-                  style={{ width: '100%', background: CARD, borderRadius: '10px', border: 'none', padding: '10px', color: WHITE, fontSize: '14px', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box' }}/>
+        <div style={{ padding: '16px 20px 8px', flexShrink: 0 }}>
+          <h2 style={{ fontSize: '28px', fontWeight: '800', color: WHITE, letterSpacing: '-0.5px' }}>Library</h2>
+          <p style={{ fontSize: '13px', color: GRAY, marginTop: '4px' }}>{filtered.length} exercises{search ? ` matching "${search}"` : ''}</p>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
+          {filtered.map((ex, i) => (
+            <div key={ex.id || ex.name} onClick={() => handleSelectExercise(ex)}
+              style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 0', borderBottom: i < filtered.length-1 ? `1px solid ${CARD2}` : 'none', cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: ex.isMine ? CARD2 : CARD, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {ex.isMine ? <CheckIcon size={18} color={WHITE}/> : <DumbbellIcon color={GRAY} size={16}/>}
               </div>
-            ))}
-          </div>
-          <button onClick={handleCreateNew} disabled={saving} style={{ ...PILL_BTN, width: '100%', padding: '14px', opacity: saving ? 0.6 : 1 }}>{saving ? 'Adding...' : 'Add exercise'} <ArrowIcon /></button>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '16px', fontWeight: '500', color: WHITE }}>{ex.name}</p>
+                {ex.isMine && <p style={{ fontSize: '12px', color: GRAY, marginTop: '2px' }}>{ex.sets} sets · {ex.reps} reps</p>}
+              </div>
+              <ChevronRight />
+            </div>
+          ))}
         </div>
+      </div>
+      {showCreate && (
+        <ExerciseSettingsScreen
+          programId={programId}
+          onSave={() => { setShowCreate(false); onAdded(); onClose() }}
+          onClose={() => setShowCreate(false)}
+        />
       )}
-      <div style={{ padding: '16px 20px 8px', flexShrink: 0 }}>
-        <h2 style={{ fontSize: '28px', fontWeight: '800', color: WHITE, letterSpacing: '-0.5px' }}>Library</h2>
-        <p style={{ fontSize: '13px', color: GRAY, marginTop: '4px' }}>{filtered.length} exercises{search ? ` matching "${search}"` : ''}</p>
-      </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
-        {filtered.map((ex, i) => (
-          <div key={ex.id || ex.name} onClick={() => handleSelectExercise(ex)}
-            style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 0', borderBottom: i < filtered.length-1 ? `1px solid ${CARD2}` : 'none', cursor: 'pointer' }}>
-            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: ex.isMine ? CARD2 : CARD, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              {ex.isMine ? <CheckIcon size={18} color={WHITE}/> : <DumbbellIcon color={GRAY} size={16}/>}
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: '16px', fontWeight: '500', color: WHITE }}>{ex.name}</p>
-              {ex.isMine && <p style={{ fontSize: '12px', color: GRAY, marginTop: '2px' }}>{ex.sets} sets · {ex.reps} reps</p>}
-            </div>
-            <ChevronRight />
-          </div>
-        ))}
-      </div>
-    </div>
+    </>
   )
 }
 
