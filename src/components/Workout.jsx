@@ -786,10 +786,11 @@ function ExerciseLibrary({ myExercises, onClose, onAdded, programId }) {
 }
 
 // ─── Active Workout Screen ────────────────────────────────────────────────────
-function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, onToggle, onBack, onFinish, onLogSet, onToggleDone, onStartRest, onRefresh }) {
+function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, onToggle, onBack, onFinish, onCancel, onLogSet, onToggleDone, onStartRest, onRefresh }) {
   const [activeEx,    setActiveEx]    = useState(null)
   const [showLibrary, setShowLibrary] = useState(false)
   const [confirmEx,   setConfirmEx]   = useState(null)
+  const [confirmCancel, setConfirmCancel] = useState(false)
   const allExercises = prog.exercises
   const doneCnt = allExercises.filter(e => todayLogs[e.id]?.done).length
 
@@ -799,11 +800,20 @@ function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, 
     setConfirmEx(null); onRefresh()
   }
 
+  const handleCancelWorkout = async () => {
+    const exIds = allExercises.map(e => e.id)
+    await supabase.from('workout_logs').delete().in('exercise_id', exIds).eq('logged_date', TODAY)
+    await supabase.from('workout_set_logs').delete().in('exercise_id', exIds).eq('logged_date', TODAY)
+    setConfirmCancel(false)
+    onCancel()
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: BG, zIndex: 150, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '56px 20px 20px', flexShrink: 0 }}>
         <button onClick={onBack} style={{ background: CARD2, border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><BackIcon /></button>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button onClick={() => setConfirmCancel(true)} style={{ background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: '100px', padding: '10px 16px', color: '#EF4444', fontSize: '14px', fontWeight: '600', fontFamily: 'Inter, sans-serif', cursor: 'pointer' }}>Cancel</button>
           <button onClick={onToggle} style={{ background: CARD2, border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             {running ? <svg width="14" height="14" viewBox="0 0 24 24" fill={WHITE}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> : <svg width="14" height="14" viewBox="0 0 24 24" fill={WHITE}><polygon points="5 3 19 12 5 21 5 3"/></svg>}
           </button>
@@ -832,6 +842,14 @@ function ActiveWorkoutScreen({ prog, elapsed, running, todayLogs, lastWeekLogs, 
       {activeEx && <ExerciseDetailScreen ex={activeEx} log={todayLogs[activeEx.id]} lastLog={lastWeekLogs[activeEx.id]} onBack={() => setActiveEx(null)} onLogSet={(exId, w, r, n, sn) => onLogSet(exId, w, r, n, sn)} onStartRest={onStartRest} onDelete={() => { setActiveEx(null); setConfirmEx(activeEx) }}/>}
       {showLibrary && <ExerciseLibrary myExercises={prog.exercises} programId={prog.id} onAdded={onRefresh} onClose={() => setShowLibrary(false)}/>}
       {confirmEx && <ConfirmDeleteModal title={`Delete "${confirmEx.name}"?`} subtitle="This will remove the exercise from your program. All logged data will be lost." onConfirm={handleDeleteExercise} onCancel={() => setConfirmEx(null)}/>}
+      {confirmCancel && (
+        <ConfirmDeleteModal
+          title="Cancel workout?"
+          subtitle="All progress for this session will be deleted. This cannot be undone."
+          onConfirm={handleCancelWorkout}
+          onCancel={() => setConfirmCancel(false)}
+        />
+      )}
     </div>
   )
 }
@@ -1067,7 +1085,8 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
     else { setSelected(p.id); setSelectedDayOfWeek(dow) }
   }
   const handleStartWorkout  = () => { onStartWorkout(); setShowWorkout(true) }
-  const handleFinishWorkout = async () => { if (selected && workoutElapsed > 60) { await supabase.from("workout_sessions").insert({ program_id: selected, logged_date: TODAY, duration_seconds: workoutElapsed }) }; onStopWorkout(); setSelected(null); setSelectedDayOfWeek(null); setShowWorkout(false) }
+  const handleFinishWorkout = async () => { if (selected && workoutElapsed > 60) { await supabase.from('workout_sessions').insert({ program_id: selected, logged_date: TODAY, duration_seconds: workoutElapsed }) }; onStopWorkout(); setSelected(null); setSelectedDayOfWeek(null); setShowWorkout(false) }
+  const handleCancelWorkout = () => { onStopWorkout(); setSelected(null); setSelectedDayOfWeek(null); setShowWorkout(false); setTodayLogs({}) }
   const saveProg = async () => {
     if (!progForm.name.trim()) return
     let progId
@@ -1106,7 +1125,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
 
       {workoutActive && showWorkout && prog && (
         <ActiveWorkoutScreen prog={prog} elapsed={workoutElapsed} running={workoutRunning} todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
-          onToggle={onToggleTimer} onBack={() => setShowWorkout(false)} onFinish={handleFinishWorkout}
+          onToggle={onToggleTimer} onBack={() => setShowWorkout(false)} onFinish={handleFinishWorkout} onCancel={handleCancelWorkout}
           onLogSet={handleLogSet} onToggleDone={handleToggleDone} onStartRest={startRest} onRefresh={refreshExercises}/>
       )}
 
