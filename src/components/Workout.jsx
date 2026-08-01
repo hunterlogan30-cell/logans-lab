@@ -1015,6 +1015,19 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
   }
 
   const startRest       = (secs) => setRestTimer({ secs: getRecommendedRest(secs, recoveryScore), key: Date.now() })
+
+  const refreshExercises = async () => {
+    try {
+      const [{ data: progs }, { data: exs }] = await Promise.all([
+        supabase.from('programs').select('*').order('id'),
+        supabase.from('exercises').select('*').order('sort_order'),
+      ])
+      const exMap = {}; const topLevel = []
+      exs?.forEach(e => { exMap[e.id] = { ...e, variants: [] } })
+      exs?.forEach(e => { if (e.parent_id) { if (exMap[e.parent_id]) exMap[e.parent_id].variants.push(exMap[e.id]) } else topLevel.push(exMap[e.id]) })
+      setPrograms(progs?.map(p => ({ ...p, exercises: topLevel.filter(e => e.program_id === p.id) })) || [])
+    } catch(e) { console.error(e) }
+  }
   const handleToggleDone = (ex) => { const newDone = !todayLogs[ex.id]?.done; handleLogChange(ex.id, 'done', newDone); if (newDone) startRest(ex.rest_seconds || 90) }
   const handleSelectProgram = (p, dow) => {
     if (selected === p.id && selectedDayOfWeek === dow) { setSelected(null); setSelectedDayOfWeek(null) }
@@ -1061,7 +1074,7 @@ export default function Workout({ workoutActive, workoutElapsed, workoutRunning,
       {workoutActive && showWorkout && prog && (
         <ActiveWorkoutScreen prog={prog} elapsed={workoutElapsed} running={workoutRunning} todayLogs={todayLogs} lastWeekLogs={lastWeekLogs}
           onToggle={onToggleTimer} onBack={() => setShowWorkout(false)} onFinish={handleFinishWorkout}
-          onLogSet={handleLogSet} onToggleDone={handleToggleDone} onStartRest={startRest} onRefresh={loadAll}/>
+          onLogSet={handleLogSet} onToggleDone={handleToggleDone} onStartRest={startRest} onRefresh={refreshExercises}/>
       )}
 
       {restTimer && <RestTimer key={restTimer.key} restSeconds={restTimer.secs} onDismiss={() => setRestTimer(null)} />}

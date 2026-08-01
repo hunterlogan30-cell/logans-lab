@@ -17,6 +17,36 @@ export default function App() {
   const [whoopData, setWhoopData] = useState(null)
   const intervalRef = useRef(null)
 
+  // ── Restore workout state from localStorage on mount ──
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('workoutState')
+      if (saved) {
+        const { active, startTime, pausedAt, running } = JSON.parse(saved)
+        if (active && startTime) {
+          setWorkoutActive(true)
+          setWorkoutStartTime(startTime)
+          setWorkoutRunning(running)
+          if (pausedAt) setWorkoutPausedAt(pausedAt)
+          if (running) setWorkoutElapsed(Math.floor((Date.now() - startTime) / 1000))
+          else if (pausedAt) setWorkoutElapsed(Math.floor((pausedAt - startTime) / 1000))
+        }
+      }
+    } catch(e) {}
+  }, [])
+
+  // ── Persist workout state whenever it changes ──
+  useEffect(() => {
+    if (workoutActive) {
+      localStorage.setItem('workoutState', JSON.stringify({
+        active: workoutActive,
+        startTime: workoutStartTime,
+        pausedAt: workoutPausedAt,
+        running: workoutRunning,
+      }))
+    }
+  }, [workoutActive, workoutStartTime, workoutPausedAt, workoutRunning])
+
   useEffect(() => {
     const handler = () => setWide(window.innerWidth >= 768)
     window.addEventListener('resize', handler)
@@ -62,8 +92,10 @@ export default function App() {
   }
 
   const stopWorkout = async () => {
+    localStorage.removeItem('workoutState')
     setWorkoutActive(false)
     setWorkoutStartTime(null)
+    setWorkoutPausedAt(null)
     setWorkoutElapsed(0)
     setWorkoutRunning(false)
     clearInterval(intervalRef.current)
@@ -89,6 +121,7 @@ export default function App() {
         const pausedDuration = Date.now() - workoutPausedAt
         setWorkoutStartTime(t => t + pausedDuration)
       }
+      setWorkoutPausedAt(null)
       setWorkoutRunning(true)
     }
   }
@@ -128,20 +161,12 @@ export default function App() {
       style={{ minHeight: '100dvh' }}
     >
       {wide ? (
-  <div style={{ display: 'flex', minHeight: '100dvh' }}>
-    <BottomNav tab={tab} setTab={setTab} />
-    <div style={{
-  position: 'fixed',
-  left: '220px',
-  top: 0,
-  right: 0,
-  bottom: 0,
-  overflowY: 'auto',
-  overflowX: 'hidden',
-}}>
-      {tabContent}
-    </div>
-  </div>
+        <div style={{ display: 'flex', minHeight: '100dvh' }}>
+          <BottomNav tab={tab} setTab={setTab} />
+          <div style={{ position: 'fixed', left: '220px', top: 0, right: 0, bottom: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+            {tabContent}
+          </div>
+        </div>
       ) : (
         <>
           {tabContent}
